@@ -1,0 +1,10 @@
+# Thứ tự đọc tài liệu (khuyến nghị):
+
+1. 00-START-HERE.md         (5 phút)  - Overview & Navigation
+2. SUMMARY.md               (10 phút) - Hiện trạng & Kế hoạch ⭐
+3. IMPLEMENTATION-GUIDE.md  (1 giờ)  - Hướng dẫn Code chi tiết ⭐
+4. GAP-ANALYSIS-AND-RECOMMENDATIONS.md (30 phút) - Phân tích gap
+5. COMPARISON-CHART.md      (20 phút) - So sánh visual
+6. README.md                (Reference) - Index & Navigation
+
+Total: ~2 giờ để đọc hết → Ready to code!

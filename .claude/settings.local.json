@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod tidy:*)",
+      "Bash(curl:*)",
+      "Bash(psql:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbWFpbCI6InRlc3RAZ2VhcnZuLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzYyOTU1MzAxLCJpYXQiOjE3NjIzNTA1MDF9._d3TQaTsIXUV2OzZGinWBK5XqUafFv5Bwqrxzaw9hqw\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Following</title>
+</head>
+<body>
+  <h1>Test Following Feature</h1>
+  <div id="test-results"></div>
+
+  <script type="module">
+    import { getAllCreators } from "./scripts/data.js";
+
+    const results = document.getElementById('test-results');
+
+    try {
+      // Test 1: Check if getAllCreators works
+      const creators = getAllCreators();
+      results.innerHTML += `<p>✅ getAllCreators works: ${creators.length} creators found</p>`;
+      console.log('Creators:', creators);
+
+      // Test 2: Check localStorage
+      const following = JSON.parse(localStorage.getItem('following') || '{}');
+      results.innerHTML += `<p>📦 Following in localStorage: ${JSON.stringify(following)}</p>`;
+
+      // Test 3: Add a test follow
+      localStorage.setItem('following', JSON.stringify({
+        'gearvn-studio': true,
+        'ux-planet': true
+      }));
+      results.innerHTML += `<p>✅ Added test follows to localStorage</p>`;
+
+      // Test 4: Read back
+      const followingIds = Object.keys(JSON.parse(localStorage.getItem('following') || '{}'))
+        .filter(id => JSON.parse(localStorage.getItem('following') || '{}')[id] === true);
+      results.innerHTML += `<p>📋 Following IDs: ${followingIds.join(', ')}</p>`;
+
+      // Test 5: Filter creators
+      const followingCreators = creators.filter(creator => followingIds.includes(creator.id));
+      results.innerHTML += `<p>✅ Filtered creators: ${followingCreators.length} found</p>`;
+      followingCreators.forEach(c => {
+        results.innerHTML += `<p style="margin-left: 20px;">- ${c.name} (${c.id})</p>`;
+      });
+
+    } catch (error) {
+      results.innerHTML += `<p style="color: red;">❌ Error: ${error.message}</p>`;
+      console.error(error);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập - GearVN Creator Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'theme-surface': 'rgb(var(--color-surface) / <alpha-value>)',
+                        'theme-panel': 'rgb(var(--color-panel) / <alpha-value>)',
+                        'theme-card': 'rgb(var(--color-card) / <alpha-value>)',
+                        'theme-border': 'rgb(var(--color-border) / <alpha-value>)',
+                        'theme-primary': 'rgb(var(--color-text-primary) / <alpha-value>)',
+                        'theme-secondary': 'rgb(var(--color-text-secondary) / <alpha-value>)',
+                        'theme-muted': 'rgb(var(--color-text-muted) / <alpha-value>)',
+                        'theme-accent': 'rgb(var(--color-accent) / <alpha-value>)',
+                        'theme-accent-hover': 'rgb(var(--color-accent-hover) / <alpha-value>)',
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-theme-surface text-theme-primary">
+    <div class="min-h-screen flex items-center justify-center px-4">
+        <div class="max-w-md w-full">
+            <!-- Logo & Title -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-theme-accent mb-2">GearVN Creator Hub</h1>
+                <p class="text-theme-muted">Đăng nhập để tiếp tục</p>
+            </div>
+
+            <!-- Login Form -->
+            <div class="bg-theme-panel rounded-lg p-8 border border-theme-border">
+                <form id="loginForm">
+                    <!-- Email -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-theme-secondary">Email</label>
+                        <input
+                            type="email"
+                            id="email"
+                            required
+                            class="w-full px-4 py-2 bg-theme-card border border-theme-border rounded-lg focus:outline-none focus:border-theme-accent text-theme-primary placeholder:text-theme-muted"
+                            placeholder="your@email.com"
+                        >
+                    </div>
+
+                    <!-- Password -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2 text-theme-secondary">Mật khẩu</label>
+                        <input
+                            type="password"
+                            id="password"
+                            required
+                            class="w-full px-4 py-2 bg-theme-card border border-theme-border rounded-lg focus:outline-none focus:border-theme-accent text-theme-primary placeholder:text-theme-muted"
+                            placeholder="••••••••"
+                        >
+                    </div>
+
+                    <!-- Error Message -->
+                    <div id="errorMessage" class="hidden mb-4 p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-500 text-sm">
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="loadingState" class="hidden mb-4 text-center text-theme-secondary">
+                        <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-theme-accent mr-2"></div>
+                        Đang đăng nhập...
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button
+                        type="submit"
+                        id="submitBtn"
+                        class="w-full bg-theme-accent hover:bg-theme-accent-hover text-white font-medium py-2 rounded-lg transition"
+                    >
+                        Đăng nhập
+                    </button>
+                </form>
+
+                <!-- Demo Credentials -->
+                <div class="mt-4 p-3 bg-theme-accent/10 border border-theme-accent/30 rounded-lg text-sm">
+                    <p class="text-theme-accent font-medium mb-1">Demo Account:</p>
+                    <p class="text-theme-secondary">Email: admin@gearvn.com</p>
+                    <p class="text-theme-secondary">Password: admin123</p>
+                </div>
+
+                <!-- Register Link -->
+                <div class="mt-6 text-center text-sm">
+                    <span class="text-theme-muted">Chưa có tài khoản?</span>
+                    <a href="register.html" class="text-theme-accent hover:text-theme-accent-hover hover:underline ml-1">Đăng ký ngay</a>
+                </div>
+
+                <!-- Back to Home -->
+                <div class="mt-4 text-center">
+                    <a href="index.html" class="text-theme-muted hover:text-theme-primary text-sm transition">
+                        ← Quay lại trang chủ
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./scripts/theme.js"></script>
+    <script src="./scripts/api-client.js"></script>
+    <script>
+        const form = document.getElementById('loginForm');
+        const errorMessage = document.getElementById('errorMessage');
+        const loadingState = document.getElementById('loadingState');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            // Hide error, show loading
+            errorMessage.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+            submitBtn.disabled = true;
+
+            try {
+                await api.login(email, password);
+
+                // Success - redirect to home
+                window.location.href = 'index.html';
+            } catch (error) {
+                // Show error
+                errorMessage.textContent = error.message;
+                errorMessage.classList.remove('hidden');
+                loadingState.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

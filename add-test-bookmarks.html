@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Test Bookmarks - Helper Tool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-900 p-8 text-slate-100">
+  <div class="mx-auto max-w-4xl">
+    <h1 class="text-3xl font-bold text-white mb-6">🔧 Bookmark Testing Helper</h1>
+
+    <div class="space-y-6">
+      <!-- Current Bookmarks -->
+      <div class="rounded-lg border border-slate-700 bg-slate-800 p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">Current Bookmarks</h2>
+        <div id="current-bookmarks" class="text-sm text-slate-300"></div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="rounded-lg border border-slate-700 bg-slate-800 p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">Quick Actions</h2>
+        <div class="flex flex-wrap gap-3">
+          <button
+            id="add-test-bookmarks"
+            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+          >
+            Add 5 Test Bookmarks
+          </button>
+          <button
+            id="clear-all"
+            class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
+          >
+            Clear All Bookmarks
+          </button>
+          <a
+            href="bookmarks.html"
+            class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-500"
+          >
+            Go to Bookmarks Page →
+          </a>
+        </div>
+      </div>
+
+      <!-- Manual Add -->
+      <div class="rounded-lg border border-slate-700 bg-slate-800 p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">Manually Add Bookmark</h2>
+        <div class="flex gap-3">
+          <input
+            type="text"
+            id="post-id-input"
+            placeholder="Enter post ID (e.g., ai-gaming-trends)"
+            class="flex-1 rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+          />
+          <button
+            id="add-custom"
+            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+          >
+            Add Bookmark
+          </button>
+        </div>
+      </div>
+
+      <!-- Available Posts Reference -->
+      <div class="rounded-lg border border-slate-700 bg-slate-800 p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">Available Post IDs (Reference)</h2>
+        <div id="available-posts" class="grid grid-cols-2 gap-2 text-xs text-slate-400"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { getAllPosts } from './scripts/data.js';
+
+    // Display current bookmarks
+    function displayCurrentBookmarks() {
+      const bookmarked = JSON.parse(localStorage.getItem('bookmarked') || '{}');
+      const bookmarkedIds = Object.keys(bookmarked).filter(id => bookmarked[id] === true);
+
+      const container = document.getElementById('current-bookmarks');
+
+      if (bookmarkedIds.length === 0) {
+        container.innerHTML = '<p class="text-slate-500">No bookmarks yet.</p>';
+      } else {
+        container.innerHTML = `
+          <p class="mb-2 font-semibold">${bookmarkedIds.length} bookmarked posts:</p>
+          <ul class="list-disc list-inside space-y-1">
+            ${bookmarkedIds.map(id => `<li><code class="text-blue-400">${id}</code></li>`).join('')}
+          </ul>
+        `;
+      }
+    }
+
+    // Display available posts
+    function displayAvailablePosts() {
+      const posts = getAllPosts();
+      const container = document.getElementById('available-posts');
+
+      container.innerHTML = posts.map(post =>
+        `<div class="rounded bg-slate-900 p-2"><code class="text-blue-400">${post.id}</code></div>`
+      ).join('');
+    }
+
+    // Add test bookmarks
+    document.getElementById('add-test-bookmarks').addEventListener('click', () => {
+      const posts = getAllPosts();
+      const testBookmarks = {};
+
+      // Add first 5 posts as bookmarks
+      posts.slice(0, 5).forEach(post => {
+        testBookmarks[post.id] = true;
+      });
+
+      localStorage.setItem('bookmarked', JSON.stringify(testBookmarks));
+      displayCurrentBookmarks();
+      alert('✅ Added 5 test bookmarks!');
+    });
+
+    // Clear all bookmarks
+    document.getElementById('clear-all').addEventListener('click', () => {
+      if (confirm('Are you sure you want to clear all bookmarks?')) {
+        localStorage.setItem('bookmarked', JSON.stringify({}));
+        displayCurrentBookmarks();
+        alert('✅ All bookmarks cleared!');
+      }
+    });
+
+    // Add custom bookmark
+    document.getElementById('add-custom').addEventListener('click', () => {
+      const input = document.getElementById('post-id-input');
+      const postId = input.value.trim();
+
+      if (!postId) {
+        alert('❌ Please enter a post ID');
+        return;
+      }
+
+      const posts = getAllPosts();
+      const postExists = posts.some(post => post.id === postId);
+
+      if (!postExists) {
+        alert(`❌ Post ID "${postId}" not found. Check the available posts list below.`);
+        return;
+      }
+
+      const bookmarked = JSON.parse(localStorage.getItem('bookmarked') || '{}');
+      bookmarked[postId] = true;
+      localStorage.setItem('bookmarked', JSON.stringify(bookmarked));
+
+      displayCurrentBookmarks();
+      input.value = '';
+      alert(`✅ Added bookmark for "${postId}"!`);
+    });
+
+    // Initialize
+    displayCurrentBookmarks();
+    displayAvailablePosts();
+  </script>
+</body>
+</html>

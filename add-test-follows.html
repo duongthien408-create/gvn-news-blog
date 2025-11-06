@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Test Follows</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #0f172a;
+      color: #fff;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    .info {
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .success {
+      color: #10b981;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Add Test Follows</h1>
+
+  <div class="info">
+    <h3>Current Following:</h3>
+    <div id="current-following">Loading...</div>
+  </div>
+
+  <h3>Quick Actions:</h3>
+  <button onclick="addTestFollows()">Add 3 Test Follows</button>
+  <button onclick="clearAllFollows()">Clear All Follows</button>
+  <button onclick="showCurrent()">Refresh Display</button>
+  <button onclick="goToFollowing()">Go to Following Page</button>
+
+  <div class="info">
+    <h3>Manual Add:</h3>
+    <select id="creator-select">
+      <option value="">-- Select Creator --</option>
+      <option value="gearvn-studio">GearVN Studio</option>
+      <option value="ux-planet">UX Planet</option>
+      <option value="creator-lab">Creator Lab</option>
+      <option value="render-vn">RenderVN</option>
+      <option value="workflow-daily">Workflow Daily</option>
+      <option value="streammaster">StreamMaster</option>
+      <option value="designops-vn">DesignOps VN</option>
+      <option value="pixel-stories">Pixel Stories</option>
+    </select>
+    <button onclick="addSelectedCreator()">Add Selected</button>
+  </div>
+
+  <script>
+    function showCurrent() {
+      const following = JSON.parse(localStorage.getItem('following') || '{}');
+      const followingIds = Object.keys(following).filter(id => following[id] === true);
+
+      const display = document.getElementById('current-following');
+      if (followingIds.length === 0) {
+        display.innerHTML = '<p style="color: #64748b;">No creators followed yet.</p>';
+      } else {
+        display.innerHTML = `
+          <p class="success">Following ${followingIds.length} creators:</p>
+          <ul>
+            ${followingIds.map(id => `<li>${id}</li>`).join('')}
+          </ul>
+        `;
+      }
+    }
+
+    function addTestFollows() {
+      const testFollows = {
+        'gearvn-studio': true,
+        'ux-planet': true,
+        'creator-lab': true
+      };
+
+      localStorage.setItem('following', JSON.stringify(testFollows));
+      alert('✅ Added 3 test follows: GearVN Studio, UX Planet, Creator Lab');
+      showCurrent();
+    }
+
+    function clearAllFollows() {
+      localStorage.removeItem('following');
+      alert('🗑️ Cleared all follows');
+      showCurrent();
+    }
+
+    function addSelectedCreator() {
+      const select = document.getElementById('creator-select');
+      const creatorId = select.value;
+
+      if (!creatorId) {
+        alert('Please select a creator');
+        return;
+      }
+
+      const following = JSON.parse(localStorage.getItem('following') || '{}');
+      following[creatorId] = true;
+      localStorage.setItem('following', JSON.stringify(following));
+
+      alert(`✅ Added ${creatorId} to following`);
+      showCurrent();
+      select.value = '';
+    }
+
+    function goToFollowing() {
+      window.location.href = 'following.html';
+    }
+
+    // Show current on load
+    showCurrent();
+  </script>
+</body>
+</html>
