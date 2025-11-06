@@ -134,6 +134,14 @@
             <i data-lucide="tag" class="h-4 w-4"></i>
             Hashtag
           </a>
+          <div class="border-t border-theme-border my-2"></div>
+          <a
+            href="settings.html"
+            class="flex items-center gap-3 rounded-xl px-3 py-2 transition hover:bg-white/5 hover:text-theme-primary"
+          >
+            <i data-lucide="settings" class="h-4 w-4"></i>
+            Settings
+          </a>
         </div>
       </nav>
 
@@ -313,6 +321,9 @@
     <!-- API Client -->
     <script src="./scripts/api-client.js"></script>
 
+    <!-- Auth System -->
+    <script type="module" src="./scripts/auth.js"></script>
+
     <!-- User Menu Script -->
     <script>
       // Populate user menu based on authentication state
@@ -320,24 +331,33 @@
         const userMenuEl = document.getElementById('user-menu');
         if (!userMenuEl) return;
 
-        if (window.api && window.api.isLoggedIn()) {
-          const user = window.api.user;
+        // Wait for auth to be loaded
+        if (!window.auth) {
+          setTimeout(updateUserMenu, 100);
+          return;
+        }
+
+        const user = window.auth.getCurrentUser();
+
+        if (user) {
+          const avatar = user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || user.username)}&background=3b82f6&color=fff&size=128`;
+
           userMenuEl.innerHTML = `
             <div class="relative group">
-              <button class="flex items-center gap-2 rounded-full border border-theme-border bg-theme-card px-3 py-1.5 text-sm text-theme-primary transition hover:border-theme-border">
+              <button class="flex items-center gap-2 rounded-full border border-theme-border bg-theme-card px-3 py-1.5 text-sm text-theme-primary transition hover:border-slate-700">
                 <img
-                  src="${user.avatar || 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=facearea&w=100&q=80'}"
-                  alt="${user.username}"
+                  src="${avatar}"
+                  alt="${user.full_name || user.username}"
                   class="h-8 w-8 rounded-full object-cover"
                 />
-                <span>${user.username}</span>
+                <span class="hidden sm:inline">${user.full_name || user.username}</span>
                 <i data-lucide="chevron-down" class="h-4 w-4"></i>
               </button>
 
               <!-- Dropdown Menu -->
-              <div class="absolute right-0 mt-2 w-56 rounded-2xl border border-theme-border bg-theme-panel backdrop-blur opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-xl">
+              <div class="absolute right-0 mt-2 w-56 rounded-2xl border border-theme-border bg-theme-panel backdrop-blur opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-xl z-50">
                 <div class="p-2">
-                  <a href="profile.html?creator=${user.id}" class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-theme-secondary transition hover:bg-white/5 hover:text-theme-primary">
+                  <a href="profile.html?user=${user.username}" class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-theme-secondary transition hover:bg-white/5 hover:text-theme-primary">
                     <i data-lucide="user" class="h-4 w-4"></i>
                     <span>Profile</span>
                   </a>
@@ -363,17 +383,10 @@
             <div class="flex items-center gap-2">
               <a
                 href="login.html"
-                class="flex items-center gap-2 rounded-full border border-theme-border bg-theme-card px-4 py-2 text-sm text-theme-primary transition hover:border-theme-border"
+                class="flex items-center gap-2 rounded-full border border-theme-border bg-theme-card px-4 py-2 text-sm text-theme-primary transition hover:border-slate-700"
               >
                 <i data-lucide="log-in" class="h-4 w-4"></i>
-                <span>Đăng nhập</span>
-              </a>
-              <a
-                href="register.html"
-                class="flex items-center gap-2 rounded-full border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-200 transition hover:border-red-400/60"
-              >
-                <i data-lucide="user-plus" class="h-4 w-4"></i>
-                <span>Đăng ký</span>
+                <span class="hidden sm:inline">Đăng nhập</span>
               </a>
             </div>
           `;
@@ -387,9 +400,9 @@
 
       // Handle logout
       function handleLogout() {
-        if (window.api) {
-          window.api.logout();
-          window.location.reload();
+        if (window.auth) {
+          window.auth.clearSession();
+          window.location.href = '/login.html';
         }
       }
 
@@ -402,6 +415,7 @@
     </script>
 
     <!-- App Scripts -->
+    <script type="module" src="./scripts/edit-post-modal.js"></script>
     <script type="module" src="./scripts/post-modal.js"></script>
     <script type="module" src="./scripts/feed.js"></script>
     <script type="module" src="./scripts/interactions.js"></script>

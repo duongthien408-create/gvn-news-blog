@@ -65,8 +65,24 @@ export const renderFeed = (posts) =>
     .map(
       (post) => `
       <article class="group flex h-full flex-col rounded-2xl border border-theme-border bg-theme-panel/80 p-4 backdrop-blur transition hover:-translate-y-0.5 hover:border-theme-border/60 hover:shadow-lg cursor-pointer" onclick="window.openPostModal('${post.id}')">
-        <div class="block overflow-hidden rounded-xl border border-theme-border mb-3">
+        <div class="block relative overflow-hidden rounded-xl border border-theme-border mb-3">
           <img src="${post.image}" alt="${post.title}" class="w-full h-48 object-cover transition duration-300 group-hover:scale-105" />
+          ${post.contentType === 'video' ? `
+            <div class="absolute top-2 left-2 flex items-center gap-2">
+              <span class="inline-flex items-center gap-1 rounded-full bg-red-500/90 backdrop-blur-sm px-2 py-1 text-[10px] font-bold text-white uppercase">
+                <i data-lucide="play-circle" class="h-3 w-3"></i>
+                VIDEO
+              </span>
+            </div>
+            ${post.videoDuration ? `
+              <div class="absolute bottom-2 right-2">
+                <span class="inline-flex items-center gap-1 rounded-md bg-black/80 backdrop-blur-sm px-2 py-1 text-[11px] font-semibold text-white">
+                  <i data-lucide="clock" class="h-3 w-3"></i>
+                  ${post.videoDuration}
+                </span>
+              </div>
+            ` : ''}
+          ` : ''}
         </div>
 
         <div class="block transition hover:text-theme-accent-hover">

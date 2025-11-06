@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -9,25 +10,31 @@ import (
 )
 
 type Post struct {
-	ID            string         `json:"id"`
-	Title         string         `json:"title"`
-	Excerpt       string         `json:"excerpt"`
-	Content       string         `json:"content"`
-	CoverImage    string         `json:"cover_image"`
-	CreatorID     *string        `json:"creator_id"`
-	CreatorName   *string        `json:"creator_name"`
-	CreatorAvatar *string        `json:"creator_avatar"`
-	SourceID      *int           `json:"source_id"`
-	ExternalURL   *string        `json:"external_url"`
-	PublishedAt   *time.Time     `json:"published_at"`
-	Category      string         `json:"category"`
-	Tags          pq.StringArray `json:"tags"`
-	Upvotes       int            `json:"upvotes"`
-	CommentsCount int            `json:"comments_count"`
-	ReadTime      string         `json:"read_time"`
-	Published     bool           `json:"published"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
+	ID             string         `json:"id"`
+	Title          string         `json:"title"`
+	Excerpt        string         `json:"excerpt"`
+	Content        string         `json:"content"`
+	CoverImage     string         `json:"cover_image"`
+	CreatorID      *string        `json:"creator_id"`
+	CreatorName    *string        `json:"creator_name"`
+	CreatorAvatar  *string        `json:"creator_avatar"`
+	SourceID       *int           `json:"source_id"`
+	ExternalURL    *string        `json:"external_url"`
+	PublishedAt    *time.Time     `json:"published_at"`
+	Category       string         `json:"category"`
+	Tags           pq.StringArray `json:"tags"`
+	Upvotes        int            `json:"upvotes"`
+	CommentsCount  int            `json:"comments_count"`
+	ReadTime       string         `json:"read_time"`
+	Published      bool           `json:"published"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	// Video fields
+	ContentType    *string        `json:"content_type"`
+	VideoURL       *string        `json:"video_url"`
+	VideoThumbnail *string        `json:"video_thumbnail"`
+	VideoDuration  *string        `json:"video_duration"`
+	VideoPlatform  *string        `json:"video_platform"`
 }
 
 type Creator struct {
@@ -61,7 +68,8 @@ func getPosts(c *fiber.Ctx) error {
 	rows, err := db.Query(`
 		SELECT id, title, excerpt, cover_image, creator_id, creator_name, creator_avatar,
 		       source_id, external_url, published_at, category, tags, upvotes,
-		       comments_count, read_time, created_at
+		       comments_count, read_time, created_at,
+		       content_type, video_url, video_thumbnail, video_duration, video_platform
 		FROM posts
 		WHERE published = true
 		ORDER BY created_at DESC
@@ -79,6 +87,7 @@ func getPosts(c *fiber.Ctx) error {
 			&p.ID, &p.Title, &p.Excerpt, &p.CoverImage, &p.CreatorID, &p.CreatorName,
 			&p.CreatorAvatar, &p.SourceID, &p.ExternalURL, &p.PublishedAt, &p.Category,
 			&p.Tags, &p.Upvotes, &p.CommentsCount, &p.ReadTime, &p.CreatedAt,
+			&p.ContentType, &p.VideoURL, &p.VideoThumbnail, &p.VideoDuration, &p.VideoPlatform,
 		)
 		if err != nil {
 			continue
@@ -440,5 +449,64 @@ func addComment(c *fiber.Ctx) error {
 		"success": true,
 		"message": "Comment added",
 		"id":      commentID,
+	})
+}
+
+// ============ User Post Management ============
+
+func updateUserPost(c *fiber.Ctx) error {
+	user := c.Locals("user").(*JWTClaims)
+	postID := c.Params("id")
+
+	var req struct {
+		Title      string   `json:"title"`
+		Excerpt    string   `json:"excerpt"`
+		Content    string   `json:"content"`
+		CoverImage string   `json:"cover_image"`
+		Category   string   `json:"category"`
+		Tags       []string `json:"tags"`
+		ReadTime   string   `json:"read_time"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	// Check if post exists and belongs to user
+	var creatorID sql.NullString
+	err := db.QueryRow(`SELECT creator_id FROM posts WHERE id = $1`, postID).Scan(&creatorID)
+	if err == sql.ErrNoRows {
+		return c.Status(404).JSON(fiber.Map{"error": "Post not found"})
+	}
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to check post ownership"})
+	}
+
+	// Verify ownership (convert user.UserID to string to compare with creator_id VARCHAR)
+	if !creatorID.Valid || creatorID.String != fmt.Sprintf("%d", user.UserID) {
+		return c.Status(403).JSON(fiber.Map{"error": "You can only edit your own posts"})
+	}
+
+	// Update post (user cannot change creator_id)
+	result, err := db.Exec(`
+		UPDATE posts
+		SET title = $1, excerpt = $2, content = $3, cover_image = $4,
+		    category = $5, tags = $6, read_time = $7, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $8 AND creator_id = $9
+	`, req.Title, req.Excerpt, req.Content, req.CoverImage,
+		req.Category, pq.Array(req.Tags), req.ReadTime, postID, creatorID.String)
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update post"})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return c.Status(403).JSON(fiber.Map{"error": "You can only edit your own posts"})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Post updated successfully",
 	})
 }

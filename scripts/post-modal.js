@@ -94,6 +94,12 @@ function transformPost(p) {
     time: p.read_time || '5 min read',
     summary: plainTextExcerpt ? plainTextExcerpt + '...' : '',
     image: p.cover_image || 'https://via.placeholder.com/800x400?text=No+Image',
+    // Video fields
+    contentType: p.content_type || 'article',
+    videoUrl: p.video_url || null,
+    videoDuration: p.video_duration || null,
+    videoPlatform: p.video_platform || null,
+    videoThumbnail: p.video_thumbnail || null,
     creator: p.creator_name ? {
       id: p.creator_id,
       name: p.creator_name,
@@ -154,10 +160,26 @@ function renderModalContent(post, relatedPosts, comments) {
             </a>
 
             <div class="flex items-center gap-3">
-              <a href="${post.url || '#'}" target="_blank" class="rounded-full border border-theme-border bg-theme-card px-4 py-2 text-sm font-medium text-theme-secondary transition hover:bg-theme-panel hover:text-theme-primary">
-                Read post
-                <i data-lucide="external-link" class="ml-1 inline h-4 w-4"></i>
-              </a>
+              ${post.contentType === 'video' && post.videoUrl ? `
+                <a href="${post.videoUrl}" target="_blank" class="rounded-full border border-red-500/40 bg-red-500/20 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/30 hover:text-red-200">
+                  <i data-lucide="youtube" class="mr-1 inline h-4 w-4"></i>
+                  Watch on YouTube
+                  <i data-lucide="external-link" class="ml-1 inline h-4 w-4"></i>
+                </a>
+              ` : post.external_url || post.url ? `
+                <a href="${post.external_url || post.url}" target="_blank" class="rounded-full border border-theme-border bg-theme-card px-4 py-2 text-sm font-medium text-theme-secondary transition hover:bg-theme-panel hover:text-theme-primary">
+                  Read post
+                  <i data-lucide="external-link" class="ml-1 inline h-4 w-4"></i>
+                </a>
+              ` : ''}
+              ${window.canEditPost && window.canEditPost(post) ? `
+                <button
+                  onclick="window.openEditModal('${post.id}'); return false;"
+                  class="rounded-full border border-amber-500/40 bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-300 transition hover:bg-amber-500/30 hover:text-amber-200">
+                  <i data-lucide="edit" class="mr-1 inline h-4 w-4"></i>
+                  Edit
+                </button>
+              ` : ''}
               <button class="flex h-10 w-10 items-center justify-center rounded-full border border-theme-border bg-theme-card text-theme-secondary transition hover:bg-theme-panel hover:text-theme-primary">
                 <i data-lucide="more-horizontal" class="h-5 w-5"></i>
               </button>
@@ -170,8 +192,37 @@ function renderModalContent(post, relatedPosts, comments) {
             <p class="mt-2 text-sm text-theme-muted">${post.time} • ${new Date(post.published_at || post.created_at).toLocaleDateString('vi-VN')}</p>
           </div>
 
-          <!-- Featured Image -->
-          ${post.image ? `
+          <!-- Featured Media (Video or Image) -->
+          ${post.contentType === 'video' && (post.videoThumbnail || post.image) ? `
+            <div class="mt-6 overflow-hidden rounded-xl border border-theme-border">
+              <div class="relative group">
+                <img src="${post.videoThumbnail || post.image}" alt="${post.title}" class="w-full object-cover" />
+                <!-- Video Badge Overlay -->
+                <div class="absolute top-4 left-4 flex items-center gap-2">
+                  <span class="inline-flex items-center gap-1 rounded-full bg-red-500/90 backdrop-blur-sm px-3 py-1.5 text-xs font-bold text-white uppercase">
+                    <i data-lucide="play-circle" class="h-4 w-4"></i>
+                    VIDEO
+                  </span>
+                </div>
+                ${post.videoDuration ? `
+                  <div class="absolute bottom-4 right-4">
+                    <span class="inline-flex items-center gap-1 rounded-md bg-black/80 backdrop-blur-sm px-2 py-1 text-xs font-semibold text-white">
+                      <i data-lucide="clock" class="h-3 w-3"></i>
+                      ${post.videoDuration}
+                    </span>
+                  </div>
+                ` : ''}
+              </div>
+              <div class="px-4 py-3 bg-theme-card border-t border-theme-border">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2 text-sm text-theme-muted">
+                    <i data-lucide="youtube" class="h-4 w-4 text-red-500"></i>
+                    <span>YouTube Video</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ` : post.image ? `
             <div class="mt-6 overflow-hidden rounded-xl border border-theme-border">
               <img src="${post.image}" alt="${post.title}" class="w-full object-cover" />
             </div>

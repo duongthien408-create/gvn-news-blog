@@ -41,6 +41,27 @@ func main() {
 		log.Fatal("Failed to initialize database:", err)
 	}
 
+	// Check for migrate flag
+	if len(os.Args) > 1 && os.Args[1] == "--migrate" {
+		if err := RunMigration(db); err != nil {
+			log.Fatal("Failed to run migration:", err)
+		}
+		if err := VerifyMigration(db); err != nil {
+			log.Fatal("Failed to verify migration:", err)
+		}
+		log.Println("🎉 Migration complete! Exiting...")
+		return
+	}
+
+	// Check for seed-videos flag
+	if len(os.Args) > 1 && os.Args[1] == "--seed-videos" {
+		if err := RunSQLFile(db, "../database/02-insert-sample-videos.sql"); err != nil {
+			log.Fatal("Failed to seed videos:", err)
+		}
+		log.Println("🎉 Video seeding complete! Exiting...")
+		return
+	}
+
 	// Check for seed flag
 	if len(os.Args) > 1 && os.Args[1] == "--seed" {
 		if err := SeedDatabase(); err != nil {
@@ -287,6 +308,9 @@ func setupRoutes(app *fiber.App) {
 
 	api.Get("/posts/:id/comments", getComments)
 	api.Post("/posts/:id/comments", authMiddleware, addComment)
+
+	// User post management (edit own posts)
+	api.Put("/posts/:id", authMiddleware, updateUserPost)
 
 	// CMS routes (admin only)
 	cms := app.Group("/cms", authMiddleware, adminMiddleware)

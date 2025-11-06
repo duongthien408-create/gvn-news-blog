@@ -4,6 +4,11 @@
 const API_CONFIG = {
     baseURL: 'http://localhost:8080/api',
     timeout: 10000,
+    // Supabase REST API fallback
+    supabase: {
+        url: 'https://qibhlrsdykpkbsnelubz.supabase.co',
+        key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYmhscnNkeWtwa2JzbmVsdWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzNDc4NzEsImV4cCI6MjA3NzkyMzg3MX0.jmwZ8r_7dC8fU5hIlgXrFZUpJBxE07bZyBEuLoG1SrM'
+    }
 };
 
 class APIClient {
@@ -37,6 +42,10 @@ class APIClient {
     }
 
     getUser() {
+        return this.user;
+    }
+
+    getCurrentUser() {
         return this.user;
     }
 
@@ -106,13 +115,115 @@ class APIClient {
     // ============ POSTS ENDPOINTS ============
 
     async getPosts(params = {}) {
-        const query = new URLSearchParams(params);
-        const queryString = query.toString();
-        return await this.request(`/posts${queryString ? '?' + queryString : ''}`);
+        try {
+            // Try Go backend first
+            const query = new URLSearchParams(params);
+            const queryString = query.toString();
+            return await this.request(`/posts${queryString ? '?' + queryString : ''}`);
+        } catch (error) {
+            console.warn('⚠️ Go backend unavailable, using Supabase REST API fallback');
+
+            // Fallback to Supabase REST API
+            const limit = params.limit || 50;
+            const postsUrl = `${API_CONFIG.supabase.url}/rest/v1/posts?select=*&published=eq.true&order=created_at.desc&limit=${limit}`;
+
+            const postsResponse = await fetch(postsUrl, {
+                headers: {
+                    'apikey': API_CONFIG.supabase.key,
+                    'Authorization': `Bearer ${API_CONFIG.supabase.key}`
+                }
+            });
+
+            if (!postsResponse.ok) {
+                throw new Error(`Supabase API error: ${postsResponse.status}`);
+            }
+
+            const posts = await postsResponse.json();
+
+            // Get unique creator IDs and fetch users
+            const creatorIds = [...new Set(posts.map(p => p.creator_id).filter(Boolean))];
+            let creatorsMap = {};
+
+            if (creatorIds.length > 0) {
+                const usersUrl = `${API_CONFIG.supabase.url}/rest/v1/users?select=id,username,full_name,avatar_url&id=in.(${creatorIds.join(',')})`;
+                const usersResponse = await fetch(usersUrl, {
+                    headers: {
+                        'apikey': API_CONFIG.supabase.key,
+                        'Authorization': `Bearer ${API_CONFIG.supabase.key}`
+                    }
+                });
+
+                if (usersResponse.ok) {
+                    const users = await usersResponse.json();
+                    creatorsMap = users.reduce((acc, user) => {
+                        acc[user.id.toString()] = user;
+                        return acc;
+                    }, {});
+                }
+            }
+
+            // Transform posts to include creator info
+            return posts.map(post => {
+                const creator = creatorsMap[post.creator_id];
+                return {
+                    ...post,
+                    creator_name: creator?.full_name || creator?.username || null,
+                    creator_avatar: creator?.avatar_url || null
+                };
+            });
+        }
     }
 
     async getPostById(id) {
-        return await this.request(`/posts/${id}`);
+        try {
+            // Try Go backend first
+            return await this.request(`/posts/${id}`);
+        } catch (error) {
+            console.warn('⚠️ Go backend unavailable, using Supabase REST API fallback');
+
+            // Fallback to Supabase REST API
+            const url = `${API_CONFIG.supabase.url}/rest/v1/posts?select=*&id=eq.${id}`;
+
+            const response = await fetch(url, {
+                headers: {
+                    'apikey': API_CONFIG.supabase.key,
+                    'Authorization': `Bearer ${API_CONFIG.supabase.key}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Supabase API error: ${response.status}`);
+            }
+
+            const posts = await response.json();
+            const post = posts[0] || null;
+
+            if (!post) {
+                return null;
+            }
+
+            // Fetch creator info if post has creator_id
+            if (post.creator_id) {
+                const usersUrl = `${API_CONFIG.supabase.url}/rest/v1/users?select=id,username,full_name,avatar_url&id=eq.${post.creator_id}`;
+                const usersResponse = await fetch(usersUrl, {
+                    headers: {
+                        'apikey': API_CONFIG.supabase.key,
+                        'Authorization': `Bearer ${API_CONFIG.supabase.key}`
+                    }
+                });
+
+                if (usersResponse.ok) {
+                    const users = await usersResponse.json();
+                    const creator = users[0];
+                    if (creator) {
+                        post.creator_name = creator.full_name || creator.username;
+                        post.creator_avatar = creator.avatar_url;
+                    }
+                }
+            }
+
+            return post;
+        }
     }
 
     // ============ CREATORS ENDPOINTS ============
@@ -201,7 +312,29 @@ class APIClient {
     // ============ COMMENTS ENDPOINTS ============
 
     async getComments(postId) {
-        return await this.request(`/posts/${postId}/comments`);
+        try {
+            // Try Go backend first
+            return await this.request(`/posts/${postId}/comments`);
+        } catch (error) {
+            console.warn('⚠️ Go backend unavailable, using Supabase REST API fallback for comments');
+
+            // Fallback to Supabase REST API
+            const url = `${API_CONFIG.supabase.url}/rest/v1/comments?select=*&post_id=eq.${postId}&order=created_at.desc`;
+
+            const response = await fetch(url, {
+                headers: {
+                    'apikey': API_CONFIG.supabase.key,
+                    'Authorization': `Bearer ${API_CONFIG.supabase.key}`
+                }
+            });
+
+            if (!response.ok) {
+                // Return empty array if error (comments are optional)
+                return [];
+            }
+
+            return await response.json();
+        }
     }
 
     async addComment(postId, content, parentId = null) {

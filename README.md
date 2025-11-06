@@ -391,18 +391,23 @@ cd backend && go test ./...
 
 ---
 
-## 📚 Documentation Links
+## 📚 Documentation
 
-### Getting Started
-- **[Backend Setup](backend/SETUP.md)** - Hướng dẫn setup backend
-- **[Backend Complete](BACKEND_COMPLETE.md)** - Backend feature list
-- **[Theme Colors](THEME_COLORS.md)** - Design system guide
+**All documentation has been moved to `/documentation` folder.**
 
-### Planning & Analysis
-- **[Summary](documentation/SUMMARY.md)** - Tóm tắt dự án
-- **[Implementation Guide](documentation/IMPLEMENTATION-GUIDE.md)** - Code guide
-- **[Gap Analysis](documentation/GAP-ANALYSIS-AND-RECOMMENDATIONS.md)** - So sánh với daily.dev
-- **[Comparison Chart](documentation/COMPARISON-CHART.md)** - Feature comparison
+### Quick Links
+- **[📖 Documentation Index](documentation/00-INDEX.md)** - Complete guide index
+- **[🚀 Quick Start](documentation/QUICK-START.md)** - 4-step setup (10 minutes)
+- **[✅ Final Checklist](documentation/FINAL-CHECKLIST.md)** - Complete testing checklist
+- **[🔐 Login Credentials](documentation/AUTH-CREDENTIALS.md)** - Test accounts
+
+### Common Guides
+- **[Login & Auth](documentation/LOGIN-GUIDE.md)** - Authentication system
+- **[Profile Setup](documentation/PROFILE-SETUP.md)** - User profiles & CMS
+- **[Avatar Upload](documentation/AVATAR-UPLOAD-GUIDE.md)** - Upload avatars
+- **[Troubleshooting](documentation/AVATAR-UPLOAD-FIX.md)** - Fix common errors
+
+**See [documentation/00-INDEX.md](documentation/00-INDEX.md) for complete list of guides.**
 
 ---
 

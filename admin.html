@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GearVN CMS - Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+
+    .loading-spinner {
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 3px solid #ef4444;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .status-published {
+      background-color: rgba(34, 197, 94, 0.2);
+      color: rgb(34, 197, 94);
+    }
+
+    .status-draft {
+      background-color: rgba(251, 191, 36, 0.2);
+      color: rgb(251, 191, 36);
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 50;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+
+    .modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      max-width: 100%;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background-color: #1e293b;
+      z-index: 10;
+    }
+
+    .tab-button {
+      padding: 0.75rem 1.5rem;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-button.active {
+      border-bottom-color: #ef4444;
+      color: #ef4444;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Multi-select dropdown */
+    .multiselect-dropdown {
+      position: relative;
+    }
+
+    .multiselect-options {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 200px;
+      overflow-y: auto;
+      background: #334155;
+      border: 1px solid #475569;
+      border-radius: 0.5rem;
+      margin-top: 0.25rem;
+      z-index: 10;
+    }
+
+    .multiselect-options.active {
+      display: block;
+    }
+
+    .multiselect-option {
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .multiselect-option:hover {
+      background: #475569;
+    }
+
+    .multiselect-option.selected {
+      background: #ef4444;
+      color: white;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-white">
+
+  <!-- Header -->
+  <header class="bg-slate-800 border-b border-slate-700">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <i data-lucide="settings" class="h-8 w-8 text-red-500"></i>
+          <div>
+            <h1 class="text-2xl font-bold">GearVN CMS</h1>
+            <p class="text-sm text-slate-400">Content Management System</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <a href="index.html" class="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">
+            <i data-lucide="home" class="h-4 w-4"></i>
+            <span>Back to Site</span>
+          </a>
+          <button id="refreshBtn" class="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">
+            <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tabs Navigation -->
+  <nav class="bg-slate-800 border-b border-slate-700">
+    <div class="container mx-auto px-6">
+      <div class="flex gap-8">
+        <button class="tab-button active" data-tab="posts">
+          <i data-lucide="video" class="inline h-4 w-4 mr-2"></i>
+          Video Posts
+        </button>
+        <button class="tab-button" data-tab="hashtags">
+          <i data-lucide="hash" class="inline h-4 w-4 mr-2"></i>
+          Hashtags
+        </button>
+        <button class="tab-button" data-tab="categories">
+          <i data-lucide="folder" class="inline h-4 w-4 mr-2"></i>
+          Categories
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="container mx-auto px-6 py-8">
+
+    <!-- POSTS TAB -->
+    <div id="posts-tab" class="tab-content active">
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-slate-400 text-sm">Total Videos</p>
+              <p id="totalVideos" class="text-3xl font-bold mt-1">0</p>
+            </div>
+            <i data-lucide="video" class="h-12 w-12 text-red-500"></i>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-slate-400 text-sm">Published</p>
+              <p id="publishedCount" class="text-3xl font-bold mt-1 text-green-500">0</p>
+            </div>
+            <i data-lucide="check-circle" class="h-12 w-12 text-green-500"></i>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-slate-400 text-sm">Drafts</p>
+              <p id="draftsCount" class="text-3xl font-bold mt-1 text-yellow-500">0</p>
+            </div>
+            <i data-lucide="file-text" class="h-12 w-12 text-yellow-500"></i>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-slate-400 text-sm">Total Views</p>
+              <p id="totalViews" class="text-3xl font-bold mt-1">0</p>
+            </div>
+            <i data-lucide="eye" class="h-12 w-12 text-blue-500"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters and Search -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-slate-300 mb-2">Search</label>
+            <div class="relative">
+              <i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i>
+              <input
+                type="text"
+                id="searchInput"
+                placeholder="Search by title, ID, or creator..."
+                class="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Category</label>
+            <select id="categoryFilter" class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+              <option value="">All Categories</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Status</label>
+            <select id="statusFilter" class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+              <option value="">All Status</option>
+              <option value="true">Published</option>
+              <option value="false">Draft</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Posts Table -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <div class="p-6 border-b border-slate-700">
+          <h2 class="text-xl font-bold">Video Posts</h2>
+        </div>
+
+        <div id="loadingStatePosts" class="flex items-center justify-center py-20">
+          <div class="loading-spinner"></div>
+        </div>
+
+        <div id="tableContainerPosts" class="table-container hidden">
+          <table>
+            <thead>
+              <tr class="text-left border-b border-slate-700">
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Thumbnail</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Title</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Category</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Creator</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Duration</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Status</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Date</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="postsTableBody"></tbody>
+          </table>
+        </div>
+
+        <div id="emptyStatePosts" class="hidden text-center py-20">
+          <i data-lucide="inbox" class="h-16 w-16 text-slate-600 mx-auto mb-4"></i>
+          <p class="text-slate-400">No videos found</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- HASHTAGS TAB -->
+    <div id="hashtags-tab" class="tab-content">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold">Hashtags Management</h2>
+        <button onclick="openAddHashtagModal()" class="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">
+          <i data-lucide="plus" class="h-4 w-4"></i>
+          <span>Add Hashtag</span>
+        </button>
+      </div>
+
+      <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <div id="loadingStateHashtags" class="flex items-center justify-center py-20">
+          <div class="loading-spinner"></div>
+        </div>
+
+        <div id="tableContainerHashtags" class="table-container hidden">
+          <table>
+            <thead>
+              <tr class="text-left border-b border-slate-700">
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Name</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Slug</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Color</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Usage</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Description</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="hashtagsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CATEGORIES TAB -->
+    <div id="categories-tab" class="tab-content">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold">Categories Management</h2>
+        <button onclick="openAddCategoryModal()" class="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition">
+          <i data-lucide="plus" class="h-4 w-4"></i>
+          <span>Add Category</span>
+        </button>
+      </div>
+
+      <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <div id="loadingStateCategories" class="flex items-center justify-center py-20">
+          <div class="loading-spinner"></div>
+        </div>
+
+        <div id="tableContainerCategories" class="table-container hidden">
+          <table>
+            <thead>
+              <tr class="text-left border-b border-slate-700">
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Name</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Slug</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Icon</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Color</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Posts</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Description</th>
+                <th class="px-6 py-4 text-sm font-semibold text-slate-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="categoriesTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Edit Post Modal -->
+  <div id="editModal" class="modal">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full m-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800 z-20">
+        <h2 class="text-xl font-bold">Edit Video Post</h2>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="h-6 w-6"></i>
+        </button>
+      </div>
+
+      <div class="p-6">
+        <form id="editForm" class="space-y-6">
+          <input type="hidden" id="editPostId" />
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Title</label>
+            <input
+              type="text"
+              id="editTitle"
+              required
+              class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Excerpt</label>
+            <textarea
+              id="editExcerpt"
+              rows="3"
+              class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            ></textarea>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Category</label>
+              <select id="editCategory" required class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Status</label>
+              <select id="editPublished" class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                <option value="true">Published</option>
+                <option value="false">Draft</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Video URL</label>
+              <input
+                type="url"
+                id="editVideoUrl"
+                readonly
+                class="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-slate-400 cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Duration</label>
+              <input
+                type="text"
+                id="editDuration"
+                placeholder="1:07"
+                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+          </div>
+
+          <!-- Multi-select Tags -->
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Tags (Hashtags)</label>
+            <div class="multiselect-dropdown">
+              <div id="tagsDisplay" class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white cursor-pointer min-h-[40px]" onclick="toggleTagsDropdown()">
+                <span class="text-slate-400">Select tags...</span>
+              </div>
+              <div id="tagsDropdown" class="multiselect-options">
+                <!-- Options will be populated here -->
+              </div>
+            </div>
+            <input type="hidden" id="editTags" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Creator Name</label>
+              <input
+                type="text"
+                id="editCreatorName"
+                class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Creator ID</label>
+              <input
+                type="text"
+                id="editCreatorId"
+                readonly
+                class="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-slate-400 cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-4 pt-4 border-t border-slate-700">
+            <button
+              type="button"
+              onclick="closeEditModal()"
+              class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition font-semibold"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Hashtag Modal -->
+  <div id="hashtagModal" class="modal">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-2xl w-full m-4">
+      <div class="p-6 border-b border-slate-700 flex items-center justify-between">
+        <h2 id="hashtagModalTitle" class="text-xl font-bold">Add Hashtag</h2>
+        <button onclick="closeHashtagModal()" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="h-6 w-6"></i>
+        </button>
+      </div>
+
+      <div class="p-6">
+        <form id="hashtagForm" class="space-y-6">
+          <input type="hidden" id="hashtagId" />
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Name</label>
+            <input
+              type="text"
+              id="hashtagName"
+              required
+              placeholder="Review"
+              class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Slug</label>
+            <input
+              type="text"
+              id="hashtagSlug"
+              required
+              placeholder="review"
+              class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            <p class="text-xs text-slate-400 mt-1">URL-friendly name (lowercase, no spaces)</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Color</label>
+            <div class="flex gap-4">
+              <input
+                type="color"
+                id="hashtagColor"
+                value="#ef4444"
+                class="h-10 w-20 bg-slate-700 border border-slate-600 rounded-lg cursor-pointer"
+              />
+              <input
+                type="text"
+                id="hashtagColorText"
+                value="#ef4444"
+                placeholder="#ef4444"
+                class="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Description</label>
+            <textarea
+              id="hashtagDescription"
+              rows="3"
+              placeholder="Describe this hashtag..."
+              class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-4 pt-4 border-t border-slate-700">
+            <button
+              type="button"
+              onclick="closeHashtagModal()"
+              class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition font-semibold"
+            >
+              Save Hashtag
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Category Modal -->
+  <div id="categoryModal" class="modal">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-2xl w-full m-4">
+      <div class="p-6 border-b border-slate-700 flex items-center justify-between">
+        <h2 id="categoryModalTitle" class="text-xl font-bold">Add Category</h2>
+        <button onclick="closeCategoryModal()" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="h-6 w-6"></i>
+        </button>
+      </div>
+
+      <div class="p-6">
+        <form id="categoryForm" class="space-y-6">
+          <input type="hidden" id="categoryId" />
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Name</label>
+            <input
+              type="text"
+              id="categoryName"
+              required
+              placeholder="Peripherals"
+              class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Slug</label>
+            <input
+              type="text"
+              id="categorySlug"
+              required
+              placeholder="peripherals"
+              class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Icon (Lucide icon name)</label>
+            <input
+              type="text"
+              id="categoryIcon"
+              placeholder="headphones"
+              class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            <p class="text-xs text-slate-400 mt-1">Visit <a href="https://lucide.dev/icons" target="_blank" class="text-red-400">lucide.dev</a> for icon names</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Color</label>
+            <div class="flex gap-4">
+              <input
+                type="color"
+                id="categoryColor"
+                value="#3b82f6"
+                class="h-10 w-20 bg-slate-700 border border-slate-600 rounded-lg cursor-pointer"
+              />
+              <input
+                type="text"
+                id="categoryColorText"
+                value="#3b82f6"
+                placeholder="#3b82f6"
+                class="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Description</label>
+            <textarea
+              id="categoryDescription"
+              rows="3"
+              placeholder="Describe this category..."
+              class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-4 pt-4 border-t border-slate-700">
+            <button
+              type="button"
+              onclick="closeCategoryModal()"
+              class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition font-semibold"
+            >
+              Save Category
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="scripts/api-client.js"></script>
+  <script src="scripts/admin.js"></script>
+</body>
+</html>

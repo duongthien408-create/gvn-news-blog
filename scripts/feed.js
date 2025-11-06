@@ -49,6 +49,12 @@ async function loadFeed() {
         time: post.read_time || '5 min read',
         summary: plainTextExcerpt ? plainTextExcerpt + '...' : '',
         image: post.cover_image || 'https://via.placeholder.com/400x300?text=No+Image',
+        // Video fields
+        contentType: post.content_type || 'article',
+        videoUrl: post.video_url || null,
+        videoDuration: post.video_duration || null,
+        videoPlatform: post.video_platform || null,
+        videoThumbnail: post.video_thumbnail || null,
         // Transform creator fields
         creator: post.creator_name ? {
           id: post.creator_id,
