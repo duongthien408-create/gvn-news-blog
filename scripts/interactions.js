@@ -1,9 +1,10 @@
 /**
- * interactions.js
- * Xử lý tất cả các sự kiện tương tác UI cho GearVN Creator Hub
+ * interactions.js v2.0
+ * Handle all UI interactions for GearVN Blog
+ * Updated for new voting system (up/down) and new API structure
  */
 
-// Hàm hiển thị thông báo toast
+// Toast notification helper
 function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `fixed top-4 right-4 z-50 rounded-2xl border px-6 py-4 shadow-xl backdrop-blur transition-all duration-300 ${
@@ -21,12 +22,10 @@ function showToast(message, type = 'info') {
 
   document.body.appendChild(toast);
 
-  // Refresh icons cho toast
   if (window.lucide?.createIcons) {
     window.lucide.createIcons();
   }
 
-  // Auto remove sau 3 giây
   setTimeout(() => {
     toast.style.opacity = '0';
     toast.style.transform = 'translateX(100%)';
@@ -34,29 +33,27 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
-// State quản lý tương tác (sử dụng API + localStorage cache)
+// Interaction State - cache user's votes, bookmarks, following
 const InteractionState = {
-  // Cache for performance
   _cache: {
-    upvoted: {},
+    votes: {}, // { postId: 1 | -1 | 0 }
     bookmarked: {},
     following: {}
   },
 
-  // Initialize cache from API
   async initialize() {
     if (!window.api?.isLoggedIn()) {
       return;
     }
 
     try {
-      // Load user's bookmarks, following, and upvoted posts
+      // Load user's bookmarks and following
       const [bookmarks, following] = await Promise.all([
         window.api.getBookmarks().catch(() => []),
-        window.api.getFollowing().catch(() => [])
+        window.api.getFollowingCreators().catch(() => [])
       ]);
 
-      // Cache bookmarked posts
+      // Cache bookmarked posts (now returns full post objects)
       bookmarks.forEach(post => {
         this._cache.bookmarked[post.id] = true;
       });
@@ -65,33 +62,46 @@ const InteractionState = {
       following.forEach(creator => {
         this._cache.following[creator.id] = true;
       });
+
+      console.log('✅ Interaction state initialized');
     } catch (error) {
       console.error('Error initializing interaction state:', error);
     }
   },
 
-  // Upvotes
-  getUpvoted(postId) {
-    return this._cache.upvoted[postId] || false;
+  // Votes (new system with up/down)
+  async getVote(postId) {
+    if (!window.api?.isLoggedIn()) return 0;
+
+    // Check cache first
+    if (this._cache.votes[postId] !== undefined) {
+      return this._cache.votes[postId];
+    }
+
+    // Fetch from API
+    try {
+      const result = await window.api.getUserVote(postId);
+      const voteType = result?.vote_type || 0;
+      this._cache.votes[postId] = voteType;
+      return voteType;
+    } catch {
+      return 0;
+    }
   },
 
-  async setUpvoted(postId, value) {
+  async setVote(postId, voteType) {
     if (!window.api?.isLoggedIn()) {
-      showToast('Vui lòng đăng nhập để ủng hộ bài viết', 'error');
+      showToast('Please login to vote', 'error');
       return false;
     }
 
     try {
-      if (value) {
-        await window.api.upvotePost(postId);
-      } else {
-        await window.api.removeUpvote(postId);
-      }
-      this._cache.upvoted[postId] = value;
+      await window.api.votePost(postId, voteType);
+      this._cache.votes[postId] = voteType;
       return true;
     } catch (error) {
-      console.error('Error updating upvote:', error);
-      showToast('Không thể cập nhật ủng hộ', 'error');
+      console.error('Error updating vote:', error);
+      showToast('Failed to update vote', 'error');
       return false;
     }
   },
@@ -103,21 +113,17 @@ const InteractionState = {
 
   async setBookmarked(postId, value) {
     if (!window.api?.isLoggedIn()) {
-      showToast('Vui lòng đăng nhập để lưu bài viết', 'error');
+      showToast('Please login to bookmark', 'error');
       return false;
     }
 
     try {
-      if (value) {
-        await window.api.addBookmark(postId);
-      } else {
-        await window.api.removeBookmark(postId);
-      }
+      await window.api.bookmarkPost(postId);
       this._cache.bookmarked[postId] = value;
       return true;
     } catch (error) {
       console.error('Error updating bookmark:', error);
-      showToast('Không thể cập nhật bookmark', 'error');
+      showToast('Failed to update bookmark', 'error');
       return false;
     }
   },
@@ -129,21 +135,17 @@ const InteractionState = {
 
   async setFollowing(creatorId, value) {
     if (!window.api?.isLoggedIn()) {
-      showToast('Vui lòng đăng nhập để theo dõi creator', 'error');
+      showToast('Please login to follow', 'error');
       return false;
     }
 
     try {
-      if (value) {
-        await window.api.followCreator(creatorId);
-      } else {
-        await window.api.unfollowCreator(creatorId);
-      }
+      await window.api.followCreator(creatorId);
       this._cache.following[creatorId] = value;
       return true;
     } catch (error) {
       console.error('Error updating following:', error);
-      showToast('Không thể cập nhật theo dõi', 'error');
+      showToast('Failed to update following', 'error');
       return false;
     }
   }
@@ -154,370 +156,276 @@ if (window.api?.isLoggedIn()) {
   InteractionState.initialize();
 }
 
-// Xử lý upvote
+/**
+ * Handle upvote button click
+ */
 export async function handleUpvote(postId, element) {
-  const isUpvoted = InteractionState.getUpvoted(postId);
-  const countElement = element.querySelector('.upvote-count') || element;
-  let currentCount = parseInt(countElement.textContent.replace(/[^0-9]/g, '')) || 0;
+  const currentVote = await InteractionState.getVote(postId);
+  const newVote = currentVote === 1 ? 0 : 1; // Toggle: 1 → 0, 0/−1 → 1
 
-  if (isUpvoted) {
-    // Remove upvote
-    const success = await InteractionState.setUpvoted(postId, false);
-    if (success) {
-      currentCount--;
-      element.classList.remove('bg-red-500/20', 'border-red-500/60', 'text-red-200');
-      element.classList.add('border-slate-800', 'bg-slate-900/80', 'text-slate-300');
-      countElement.textContent = currentCount;
-      showToast('Đã bỏ ủng hộ', 'info');
-    }
-  } else {
-    // Add upvote
-    const success = await InteractionState.setUpvoted(postId, true);
-    if (success) {
-      currentCount++;
-      element.classList.remove('border-slate-800', 'bg-slate-900/80', 'text-slate-300');
-      element.classList.add('bg-red-500/20', 'border-red-500/60', 'text-red-200');
-      countElement.textContent = currentCount;
-      showToast('Đã ủng hộ bài viết!', 'success');
-    }
+  const success = await InteractionState.setVote(postId, newVote);
+  if (success) {
+    // Update UI
+    updateVoteUI(postId, newVote);
+    showToast(newVote === 1 ? 'Upvoted!' : 'Removed upvote', 'success');
   }
 }
 
-// Xử lý bookmark
+/**
+ * Handle downvote button click
+ */
+export async function handleDownvote(postId, element) {
+  const currentVote = await InteractionState.getVote(postId);
+  const newVote = currentVote === -1 ? 0 : -1; // Toggle: −1 → 0, 0/1 → −1
+
+  const success = await InteractionState.setVote(postId, newVote);
+  if (success) {
+    // Update UI
+    updateVoteUI(postId, newVote);
+    showToast(newVote === -1 ? 'Downvoted' : 'Removed downvote', 'info');
+  }
+}
+
+/**
+ * Update vote button UI states
+ */
+function updateVoteUI(postId, voteType) {
+  const upvoteButtons = document.querySelectorAll(`[data-action="upvote"][data-post-id="${postId}"]`);
+  const downvoteButtons = document.querySelectorAll(`[data-action="downvote"][data-post-id="${postId}"]`);
+
+  upvoteButtons.forEach(btn => {
+    if (voteType === 1) {
+      btn.classList.add('text-green-400');
+      btn.classList.remove('text-theme-secondary');
+    } else {
+      btn.classList.remove('text-green-400');
+      btn.classList.add('text-theme-secondary');
+    }
+  });
+
+  downvoteButtons.forEach(btn => {
+    if (voteType === -1) {
+      btn.classList.add('text-red-400');
+      btn.classList.remove('text-theme-secondary');
+    } else {
+      btn.classList.remove('text-red-400');
+      btn.classList.add('text-theme-secondary');
+    }
+  });
+}
+
+/**
+ * Handle bookmark button click
+ */
 export async function handleBookmark(postId, element) {
   const isBookmarked = InteractionState.getBookmarked(postId);
-  const countElement = element.querySelector('.bookmark-count') || element;
-  let currentCount = parseInt(countElement.textContent.replace(/[^0-9]/g, '')) || 0;
 
-  if (isBookmarked) {
-    // Remove bookmark
-    const success = await InteractionState.setBookmarked(postId, false);
-    if (success) {
-      currentCount--;
-      element.classList.remove('bg-amber-500/20', 'border-amber-500/60', 'text-amber-200');
-      element.classList.add('border-slate-800', 'bg-slate-900/80', 'text-slate-500');
-      countElement.textContent = currentCount;
-      showToast('Đã bỏ lưu bài viết', 'info');
-
-      // Dispatch custom event for bookmarks page to listen
-      window.dispatchEvent(new CustomEvent('bookmarkChanged', {
-        detail: { postId, isBookmarked: false }
-      }));
+  const success = await InteractionState.setBookmarked(postId, !isBookmarked);
+  if (success) {
+    // Update UI
+    if (!isBookmarked) {
+      element.classList.add('text-amber-400');
+      element.classList.remove('text-theme-secondary');
+      showToast('Bookmarked!', 'success');
+    } else {
+      element.classList.remove('text-amber-400');
+      element.classList.add('text-theme-secondary');
+      showToast('Removed bookmark', 'info');
     }
-  } else {
-    // Add bookmark
-    const success = await InteractionState.setBookmarked(postId, true);
-    if (success) {
-      currentCount++;
-      element.classList.remove('border-slate-800', 'bg-slate-900/80', 'text-slate-500');
-      element.classList.add('bg-amber-500/20', 'border-amber-500/60', 'text-amber-200');
-      countElement.textContent = currentCount;
-      showToast('Đã lưu bài viết!', 'success');
 
-      // Dispatch custom event for bookmarks page to listen
-      window.dispatchEvent(new CustomEvent('bookmarkChanged', {
-        detail: { postId, isBookmarked: true }
-      }));
-    }
+    // Dispatch event for bookmark page
+    window.dispatchEvent(new CustomEvent('bookmarkChanged', {
+      detail: { postId, isBookmarked: !isBookmarked }
+    }));
   }
 }
 
-// Xử lý share
-export function handleShare(postId, postTitle) {
+/**
+ * Handle share button click
+ */
+export function handleShare(postId, postTitle, postSlug) {
+  const url = postSlug
+    ? `${window.location.origin}/detail.html?slug=${postSlug}`
+    : `${window.location.origin}/detail.html?id=${postId}`;
+
   const shareData = {
-    title: postTitle || 'GearVN Creator Hub',
-    text: 'Xem bài viết hay này trên GearVN Creator Hub',
-    url: `${window.location.origin}/detail.html?id=${postId}`
+    title: postTitle || 'GearVN Blog',
+    text: 'Check out this post on GearVN Blog',
+    url: url
   };
 
   if (navigator.share) {
     navigator.share(shareData)
-      .then(() => showToast('Đã chia sẻ thành công!', 'success'))
+      .then(() => showToast('Shared successfully!', 'success'))
       .catch(() => {});
   } else {
     // Fallback: copy link
-    const url = shareData.url;
     navigator.clipboard.writeText(url)
-      .then(() => showToast('Đã sao chép link!', 'success'))
-      .catch(() => showToast('Không thể sao chép link', 'error'));
+      .then(() => showToast('Link copied!', 'success'))
+      .catch(() => showToast('Failed to copy link', 'error'));
   }
 }
 
-// Xử lý follow creator
+/**
+ * Handle follow creator button click
+ */
 export async function handleFollow(creatorId, creatorName, element) {
   const isFollowing = InteractionState.getFollowing(creatorId);
 
-  if (isFollowing) {
-    // Unfollow
-    const success = await InteractionState.setFollowing(creatorId, false);
-    if (success) {
-      element.innerHTML = `
-        <i data-lucide="user-plus" class="h-4 w-4"></i>
-        Theo dõi ${creatorName}
-      `;
-      element.classList.remove('bg-slate-700/50', 'border-slate-600', 'text-slate-300');
-      element.classList.add('bg-red-500/10', 'border-red-500/50', 'text-red-200');
-      showToast(`Đã bỏ theo dõi ${creatorName}`, 'info');
-
-      // Refresh icons
-      if (window.lucide?.createIcons) {
-        window.lucide.createIcons();
-      }
-
-      // Dispatch custom event for following page to listen
-      window.dispatchEvent(new CustomEvent('followingChanged', {
-        detail: { creatorId, isFollowing: false }
-      }));
-    }
-  } else {
-    // Follow
-    const success = await InteractionState.setFollowing(creatorId, true);
-    if (success) {
+  const success = await InteractionState.setFollowing(creatorId, !isFollowing);
+  if (success) {
+    // Update UI
+    if (!isFollowing) {
       element.innerHTML = `
         <i data-lucide="user-check" class="h-4 w-4"></i>
-        Đang theo dõi
+        Following
       `;
-      element.classList.remove('bg-red-500/10', 'border-red-500/50', 'text-red-200');
-      element.classList.add('bg-slate-700/50', 'border-slate-600', 'text-slate-300');
-      showToast(`Đã theo dõi ${creatorName}!`, 'success');
-
-      // Refresh icons
-      if (window.lucide?.createIcons) {
-        window.lucide.createIcons();
-      }
-
-      // Dispatch custom event for following page to listen
-      window.dispatchEvent(new CustomEvent('followingChanged', {
-        detail: { creatorId, isFollowing: true }
-      }));
+      element.classList.add('bg-theme-accent/20', 'border-theme-accent/60');
+      showToast(`Following ${creatorName}!`, 'success');
+    } else {
+      element.innerHTML = `
+        <i data-lucide="user-plus" class="h-4 w-4"></i>
+        Follow
+      `;
+      element.classList.remove('bg-theme-accent/20', 'border-theme-accent/60');
+      showToast(`Unfollowed ${creatorName}`, 'info');
     }
+
+    if (window.lucide?.createIcons) {
+      window.lucide.createIcons();
+    }
+
+    // Dispatch event for following page
+    window.dispatchEvent(new CustomEvent('followingChanged', {
+      detail: { creatorId, isFollowing: !isFollowing }
+    }));
   }
 }
 
-// Xử lý comment form
-export async function handleCommentSubmit(postId, textarea, event) {
-  if (event) event.preventDefault();
-
-  const content = textarea.value.trim();
-
-  if (!content) {
-    showToast('Vui lòng nhập nội dung bình luận', 'error');
-    return;
-  }
-
+/**
+ * Handle comment vote (up/down)
+ */
+export async function handleCommentVote(commentId, voteType) {
   if (!window.api?.isLoggedIn()) {
-    showToast('Vui lòng đăng nhập để bình luận', 'error');
+    showToast('Please login to vote on comments', 'error');
     return;
   }
 
   try {
-    await window.api.addComment(postId, content);
-    showToast('Đã đăng bình luận!', 'success');
-    textarea.value = '';
+    await window.api.voteComment(commentId, voteType);
+    showToast(voteType === 1 ? 'Upvoted comment' : 'Downvoted comment', 'success');
 
-    // Có thể thêm logic reload comments ở đây
+    // Reload page to show updated vote counts
+    // TODO: Update UI without reload
+    setTimeout(() => location.reload(), 500);
   } catch (error) {
-    console.error('Error submitting comment:', error);
-    showToast('Không thể đăng bình luận', 'error');
+    showToast('Failed to vote on comment', 'error');
   }
 }
 
-// Xử lý khảo sát (Survey buttons)
-export function handleSurvey(rating) {
-  const messages = {
-    'helpful': 'Cảm ơn! Rất vui vì bài viết hữu ích với bạn.',
-    'okay': 'Cảm ơn phản hồi! Chúng tôi sẽ cải thiện nội dung.',
-    'improve': 'Cảm ơn! Chúng tôi sẽ cải thiện chất lượng bài viết.'
-  };
-
-  showToast(messages[rating] || 'Cảm ơn phản hồi của bạn!', 'success');
+/**
+ * Handle reply to comment
+ */
+export async function handleReplyComment(commentId) {
+  // TODO: Show reply form
+  showToast('Reply feature coming soon!', 'info');
 }
 
-// Xử lý notification bell
-export function handleNotification() {
-  showToast('Bạn không có thông báo mới', 'info');
-}
-
-// Xử lý Level Up button
-export function handleLevelUp() {
-  showToast('Tính năng Level Up đang được phát triển', 'info');
-}
-
-// Xử lý Flame button (Streak)
-export function handleStreak() {
-  showToast('Bạn đã duy trì chuỗi 7 ngày liên tiếp!', 'success');
-}
-
-// Xử lý Wallet button
-export function handleWallet() {
-  showToast('Ví của bạn: 1,250 GVN Points', 'info');
-}
-
-// Xử lý flag comment
-export function handleFlagComment(commentId) {
-  showToast('Đã báo cáo bình luận vi phạm', 'success');
-}
-
-// Xử lý nút "Đăng bài mới"
-export function handleNewPost() {
-  showToast('Tính năng đăng bài đang trong giai đoạn Beta', 'info');
-}
-
-// Xử lý reply comment
-export function handleReplyComment(commentId) {
-  showToast('Tính năng trả lời đang được phát triển', 'info');
-}
-
-// Khởi tạo tất cả event listeners cho một container
+/**
+ * Initialize all interactions in a container
+ */
 export function initializeInteractions(container = document) {
   // Upvote buttons
-  container.querySelectorAll('[data-action="upvote"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  container.querySelectorAll('[data-action="upvote"]').forEach(button => {
+    button.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const postId = btn.dataset.postId;
-      if (postId) handleUpvote(postId, btn);
+      const postId = button.dataset.postId;
+      await handleUpvote(postId, button);
+    });
+  });
+
+  // Downvote buttons
+  container.querySelectorAll('[data-action="downvote"]').forEach(button => {
+    button.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const postId = button.dataset.postId;
+      await handleDownvote(postId, button);
     });
   });
 
   // Bookmark buttons
-  container.querySelectorAll('[data-action="bookmark"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  container.querySelectorAll('[data-action="bookmark"]').forEach(button => {
+    button.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const postId = btn.dataset.postId;
-      if (postId) handleBookmark(postId, btn);
+      const postId = button.dataset.postId;
+      await handleBookmark(postId, button);
     });
   });
 
   // Share buttons
-  container.querySelectorAll('[data-action="share"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  container.querySelectorAll('[data-action="share"]').forEach(button => {
+    button.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const postId = btn.dataset.postId;
-      const postTitle = btn.dataset.postTitle;
-      if (postId) handleShare(postId, postTitle);
+      const postId = button.dataset.postId;
+      const postTitle = button.dataset.postTitle;
+      const postSlug = button.dataset.postSlug;
+      handleShare(postId, postTitle, postSlug);
     });
   });
 
   // Follow buttons
-  container.querySelectorAll('[data-action="follow"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  container.querySelectorAll('[data-action="follow"]').forEach(button => {
+    button.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const creatorId = btn.dataset.creatorId;
-      const creatorName = btn.dataset.creatorName;
-      if (creatorId) handleFollow(creatorId, creatorName, btn);
+      const creatorId = button.dataset.creatorId;
+      const creatorName = button.dataset.creatorName;
+      await handleFollow(creatorId, creatorName, button);
     });
   });
 
-  // Comment submit buttons
-  container.querySelectorAll('[data-action="submit-comment"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const postId = btn.dataset.postId;
-      const textarea = btn.closest('.comment-form')?.querySelector('textarea');
-      if (textarea && postId) handleCommentSubmit(postId, textarea, e);
-    });
-  });
-
-  // Survey buttons
-  container.querySelectorAll('[data-action="survey"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const rating = btn.dataset.rating;
-      if (rating) handleSurvey(rating);
-    });
-  });
-
-  // Flag comment buttons
-  container.querySelectorAll('[data-action="flag"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  // Comment vote buttons
+  container.querySelectorAll('[data-action="upvote-comment"]').forEach(button => {
+    button.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const commentId = btn.dataset.commentId;
-      if (commentId) handleFlagComment(commentId);
+      const commentId = button.dataset.commentId;
+      await handleCommentVote(commentId, 1);
     });
   });
 
-  // Reply comment buttons
-  container.querySelectorAll('[data-action="reply"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  container.querySelectorAll('[data-action="downvote-comment"]').forEach(button => {
+    button.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const commentId = btn.dataset.commentId;
-      if (commentId) handleReplyComment(commentId);
+      const commentId = button.dataset.commentId;
+      await handleCommentVote(commentId, -1);
     });
   });
 
-  // New post button
-  container.querySelectorAll('[data-action="new-post"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  // Comment reply buttons
+  container.querySelectorAll('[data-action="reply-comment"]').forEach(button => {
+    button.addEventListener('click', (e) => {
       e.preventDefault();
-      handleNewPost();
+      e.stopPropagation();
+      const commentId = button.dataset.commentId;
+      handleReplyComment(commentId);
     });
   });
 
-  // Notification button
-  container.querySelectorAll('[data-action="notification"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      handleNotification();
-    });
-  });
-
-  // Level up button
-  container.querySelectorAll('[data-action="level-up"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      handleLevelUp();
-    });
-  });
-
-  // Streak button
-  container.querySelectorAll('[data-action="streak"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      handleStreak();
-    });
-  });
-
-  // Wallet button
-  container.querySelectorAll('[data-action="wallet"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      handleWallet();
-    });
-  });
+  console.log('✅ Interactions initialized');
 }
 
-// Auto-init khi DOM ready
+// Auto-initialize on page load
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => initializeInteractions());
 } else {
   initializeInteractions();
 }
 
-// Export InteractionState as named export
-export { InteractionState };
-
-// Export để sử dụng trong các module khác
-export default {
-  initializeInteractions,
-  handleUpvote,
-  handleBookmark,
-  handleShare,
-  handleFollow,
-  handleCommentSubmit,
-  handleSurvey,
-  handleNotification,
-  handleLevelUp,
-  handleStreak,
-  handleWallet,
-  handleFlagComment,
-  handleNewPost,
-  handleReplyComment,
-  showToast,
-  InteractionState
-};
+// Export state for debugging
+window.InteractionState = InteractionState;

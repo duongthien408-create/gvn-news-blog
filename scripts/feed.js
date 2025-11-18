@@ -1,106 +1,115 @@
-// Feed loader - Fetches posts from API and renders them
+// Feed loader v2.0 - Updated for new API structure
+// No data transformation needed - backend returns correct structure
 
 import { renderFeed } from "./render.js";
 import { initializeInteractions } from "./interactions.js";
 
 const gridEl = document.getElementById("feed-grid");
 
-async function loadFeed() {
+async function loadFeed(filters = {}) {
   if (!gridEl) return;
 
   try {
     // Show loading state
     gridEl.innerHTML = `
-      <div class="col-span-3 flex flex-col items-center justify-center py-20">
-        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-blue-500 mb-4"></div>
-        <p class="text-gray-400">Đang tải nội dung...</p>
+      <div class="col-span-full flex flex-col items-center justify-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-theme-accent mb-4"></div>
+        <p class="text-theme-muted">Loading posts...</p>
       </div>
     `;
 
-    // Fetch posts from API
-    const posts = await window.api.getPosts({ limit: 50 });
+    // Fetch posts from API v2.0
+    // Backend returns: { id, slug, title, description, thumbnail_url, creators[], tags[], products[], ... }
+    const posts = await window.api.getPosts({
+      limit: filters.limit || 50,
+      creator: filters.creator || '',
+      tag: filters.tag || '',
+      status: 'published',
+      featured: filters.featured || '',
+      ...filters
+    });
 
     if (!posts || posts.length === 0) {
       // No posts found
       gridEl.innerHTML = `
-        <div class="col-span-3 text-center py-20">
-          <p class="text-gray-400 mb-4">Chưa có bài viết nào</p>
-          <a href="index.html" class="text-blue-500 hover:underline">Tải lại trang</a>
+        <div class="col-span-full text-center py-20">
+          <p class="text-theme-muted mb-4">No posts found</p>
+          <button
+            onclick="location.reload()"
+            class="px-4 py-2 bg-theme-accent rounded-lg hover:bg-theme-accent-hover transition text-white"
+          >
+            Reload page
+          </button>
         </div>
       `;
       return;
     }
 
-    // Transform posts data: convert API fields to expected format
-    const transformedPosts = posts.map(post => {
-      // Strip HTML tags from excerpt and truncate
-      const plainTextExcerpt = (post.excerpt || '')
-        .replace(/<[^>]*>/g, '') // Remove HTML tags
-        .replace(/\s+/g, ' ') // Normalize whitespace
-        .trim()
-        .substring(0, 150); // Limit to 150 characters
-
-      return {
-        ...post,
-        // Map API fields to render.js expected fields
-        comments: post.comments_count || 0,
-        saves: 0, // Not tracked yet
-        shares: 0, // Not tracked yet
-        time: post.read_time || '5 min read',
-        summary: plainTextExcerpt ? plainTextExcerpt + '...' : '',
-        image: post.cover_image || 'https://via.placeholder.com/400x300?text=No+Image',
-        // Video fields
-        contentType: post.content_type || 'article',
-        videoUrl: post.video_url || null,
-        videoDuration: post.video_duration || null,
-        videoPlatform: post.video_platform || null,
-        videoThumbnail: post.video_thumbnail || null,
-        // Transform creator fields
-        creator: post.creator_name ? {
-          id: post.creator_id,
-          name: post.creator_name,
-          initials: post.creator_name?.substring(0, 2).toUpperCase() || '??',
-          badge: 'bg-red-500/20 border border-red-500/40 text-red-300'
-        } : {
-          // Fallback for RSS posts: use category as creator
-          id: `source-${post.source_id || 'unknown'}`,
-          name: post.category ? post.category.charAt(0).toUpperCase() + post.category.slice(1) : 'RSS Feed',
-          initials: post.category?.substring(0, 2).toUpperCase() || 'RS',
-          badge: 'bg-slate-700/50 border border-slate-600 text-slate-300'
-        }
-      };
-    });
-
-    // Render posts
-    gridEl.innerHTML = renderFeed(transformedPosts);
+    // Render posts (no transformation needed - backend returns correct structure)
+    gridEl.innerHTML = renderFeed(posts);
 
     // Refresh Lucide icons
     if (window.lucide?.createIcons) {
       window.lucide.createIcons();
     }
 
-    // Initialize interactions (bookmarks, upvotes, etc.)
+    // Initialize interactions (voting, bookmarks, share, etc.)
     initializeInteractions(gridEl);
 
-    console.log(`✅ Loaded ${posts.length} posts from API`);
+    console.log(`✅ Loaded ${posts.length} posts from API v2.0`);
   } catch (error) {
     console.error('❌ Failed to load feed:', error);
 
     // Show error state
     gridEl.innerHTML = `
-      <div class="col-span-3 text-center py-20">
-        <p class="text-red-500 mb-4">❌ Không thể tải nội dung</p>
-        <p class="text-gray-400 mb-4 text-sm">${error.message}</p>
-        <button
-          onclick="location.reload()"
-          class="px-4 py-2 bg-red-600 rounded-lg hover:bg-red-700 transition"
-        >
-          Thử lại
-        </button>
+      <div class="col-span-full text-center py-20">
+        <div class="mb-4">
+          <i data-lucide="alert-circle" class="h-12 w-12 text-red-500 mx-auto"></i>
+        </div>
+        <p class="text-red-500 mb-2 font-semibold">Failed to load posts</p>
+        <p class="text-theme-muted mb-4 text-sm">${error.message}</p>
+        <div class="flex gap-3 justify-center">
+          <button
+            onclick="location.reload()"
+            class="px-4 py-2 bg-theme-accent rounded-lg hover:bg-theme-accent-hover transition text-white"
+          >
+            Try again
+          </button>
+          <a
+            href="index.html"
+            class="px-4 py-2 border border-theme-border rounded-lg hover:border-theme-accent transition"
+          >
+            Go home
+          </a>
+        </div>
       </div>
     `;
+
+    if (window.lucide?.createIcons) {
+      window.lucide.createIcons();
+    }
   }
 }
 
+// Filter functions
+window.filterByCreator = (creatorSlug) => {
+  loadFeed({ creator: creatorSlug });
+};
+
+window.filterByTag = (tagSlug) => {
+  loadFeed({ tag: tagSlug });
+};
+
+window.filterFeatured = () => {
+  loadFeed({ featured: 'true' });
+};
+
+window.clearFilters = () => {
+  loadFeed();
+};
+
 // Load feed on page load
 loadFeed();
+
+// Export for use in other modules
+export { loadFeed };

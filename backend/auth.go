@@ -8,18 +8,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
-
-type User struct {
-	ID           int       `json:"id"`
-	Email        string    `json:"email"`
-	Username     string    `json:"username,omitempty"`
-	AvatarURL    string    `json:"avatar_url,omitempty"`
-	Role         string    `json:"role"`
-	CreatedAt    time.Time `json:"created_at"`
-	PasswordHash string    `json:"-"`
-}
 
 type LoginRequest struct {
 	Email    string `json:"email"`
@@ -33,7 +24,7 @@ type RegisterRequest struct {
 }
 
 type JWTClaims struct {
-	UserID int    `json:"user_id"`
+	UserID string `json:"user_id"` // Changed to string for UUID
 	Email  string `json:"email"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
@@ -50,25 +41,81 @@ func register(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Email and password are required"})
 	}
 
+	if req.Username == "" {
+		req.Username = strings.Split(req.Email, "@")[0] // Default username from email
+	}
+
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to hash password"})
 	}
 
+	// Generate UUID
+	userID := uuid.New().String()
+
+	// Start transaction
+	tx, err := db.Begin()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+	defer tx.Rollback()
+
 	// Insert user
-	var userID int
-	err = db.QueryRow(
-		`INSERT INTO users (email, password_hash, username, role)
-		VALUES ($1, $2, $3, $4) RETURNING id`,
-		req.Email, string(hashedPassword), req.Username, "user",
-	).Scan(&userID)
+	_, err = tx.Exec(
+		`INSERT INTO users (id, email, password_hash, username, role, status)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		userID, req.Email, string(hashedPassword), req.Username, "user", "active",
+	)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate") {
+		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
 			return c.Status(409).JSON(fiber.Map{"error": "Email already exists"})
 		}
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to create user"})
+	}
+
+	// Create user profile
+	_, err = tx.Exec(
+		`INSERT INTO user_profiles (user_id, display_name) VALUES ($1, $2)`,
+		userID, req.Username,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to create profile"})
+	}
+
+	// Create user preferences (default values)
+	_, err = tx.Exec(
+		`INSERT INTO user_preferences (user_id, theme, language, email_notifications, push_notifications)
+		VALUES ($1, 'dark', 'en', true, false)`,
+		userID,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to create preferences"})
+	}
+
+	// Create user level (starting at level 1)
+	_, err = tx.Exec(
+		`INSERT INTO user_levels (user_id, level, total_points) VALUES ($1, 1, 0)`,
+		userID,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to create level"})
+	}
+
+	// Create user streak
+	_, err = tx.Exec(
+		`INSERT INTO streaks (user_id, current_streak, longest_streak, last_activity_date)
+		VALUES ($1, 0, 0, CURRENT_DATE)`,
+		userID,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to create streak"})
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to commit transaction"})
 	}
 
 	// Generate JWT token
@@ -96,11 +143,11 @@ func login(c *fiber.Ctx) error {
 	}
 
 	// Get user from database
-	var user User
+	var userID, email, passwordHash, username, role, status string
 	err := db.QueryRow(
-		`SELECT id, email, password_hash, username, role FROM users WHERE email = $1`,
+		`SELECT id, email, password_hash, username, role, status FROM users WHERE email = $1`,
 		req.Email,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Username, &user.Role)
+	).Scan(&userID, &email, &passwordHash, &username, &role, &status)
 
 	if err == sql.ErrNoRows {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid credentials"})
@@ -109,13 +156,18 @@ func login(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 	}
 
+	// Check if user is active
+	if status != "active" {
+		return c.Status(403).JSON(fiber.Map{"error": "Account is not active"})
+	}
+
 	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
 
 	// Generate JWT token
-	token, err := generateToken(user.ID, user.Email, user.Role)
+	token, err := generateToken(userID, email, role)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate token"})
 	}
@@ -124,31 +176,105 @@ func login(c *fiber.Ctx) error {
 		"message": "Login successful",
 		"token":   token,
 		"user": fiber.Map{
-			"id":       user.ID,
-			"email":    user.Email,
-			"username": user.Username,
-			"role":     user.Role,
+			"id":       userID,
+			"email":    email,
+			"username": username,
+			"role":     role,
 		},
 	})
 }
 
-func getCurrentUser(c *fiber.Ctx) error {
-	user := c.Locals("user").(*JWTClaims)
+func getMe(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(string)
 
-	var u User
-	err := db.QueryRow(
-		`SELECT id, email, username, avatar_url, role, created_at FROM users WHERE id = $1`,
-		user.UserID,
-	).Scan(&u.ID, &u.Email, &u.Username, &u.AvatarURL, &u.Role, &u.CreatedAt)
+	query := `
+		SELECT
+			u.id, u.email, u.username, u.role, u.status, u.created_at,
+			up.display_name, up.avatar_url, up.bio, up.website, up.location,
+			up.total_upvotes_received, up.total_posts_created,
+			ul.level, ul.total_points
+		FROM users u
+		LEFT JOIN user_profiles up ON u.id = up.user_id
+		LEFT JOIN user_levels ul ON u.id = ul.user_id
+		WHERE u.id = $1
+	`
+
+	var id, email, username, role, status string
+	var createdAt time.Time
+	var displayName, avatarURL, bio, website, location sql.NullString
+	var totalUpvotes, totalPosts, level, totalPoints sql.NullInt64
+
+	err := db.QueryRow(query, userID).Scan(
+		&id, &email, &username, &role, &status, &createdAt,
+		&displayName, &avatarURL, &bio, &website, &location,
+		&totalUpvotes, &totalPosts,
+		&level, &totalPoints,
+	)
 
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "User not found"})
 	}
 
-	return c.JSON(u)
+	return c.JSON(fiber.Map{
+		"id":         id,
+		"email":      email,
+		"username":   username,
+		"role":       role,
+		"status":     status,
+		"created_at": createdAt,
+		"profile": fiber.Map{
+			"display_name":           fromNullString(displayName),
+			"avatar_url":             fromNullString(avatarURL),
+			"bio":                    fromNullString(bio),
+			"website":                fromNullString(website),
+			"location":               fromNullString(location),
+			"total_upvotes_received": fromNullInt64(totalUpvotes),
+			"total_posts_created":    fromNullInt64(totalPosts),
+		},
+		"level": fiber.Map{
+			"level":        fromNullInt64(level),
+			"total_points": fromNullInt64(totalPoints),
+		},
+	})
 }
 
-func generateToken(userID int, email, role string) (string, error) {
+func updateProfile(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(string)
+
+	var req struct {
+		DisplayName *string `json:"display_name"`
+		AvatarURL   *string `json:"avatar_url"`
+		Bio         *string `json:"bio"`
+		Website     *string `json:"website"`
+		Location    *string `json:"location"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	_, err := db.Exec(
+		`UPDATE user_profiles
+		SET display_name = COALESCE($1, display_name),
+			avatar_url = COALESCE($2, avatar_url),
+			bio = COALESCE($3, bio),
+			website = COALESCE($4, website),
+			location = COALESCE($5, location),
+			updated_at = NOW()
+		WHERE user_id = $6`,
+		req.DisplayName, req.AvatarURL, req.Bio, req.Website, req.Location, userID,
+	)
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update profile"})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Profile updated successfully",
+	})
+}
+
+func generateToken(userID, email, role string) (string, error) {
 	claims := JWTClaims{
 		UserID: userID,
 		Email:  email,
@@ -160,7 +286,13 @@ func generateToken(userID int, email, role string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "your-secret-key-change-in-production" // Fallback for dev
+	}
+
+	return token.SignedString([]byte(jwtSecret))
 }
 
 func authMiddleware(c *fiber.Ctx) error {
@@ -177,9 +309,14 @@ func authMiddleware(c *fiber.Ctx) error {
 
 	tokenString := parts[1]
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "your-secret-key-change-in-production"
+	}
+
 	// Parse and validate token
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(os.Getenv("JWT_SECRET")), nil
+		return []byte(jwtSecret), nil
 	})
 
 	if err != nil || !token.Valid {
@@ -191,8 +328,9 @@ func authMiddleware(c *fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid token claims"})
 	}
 
-	// Store user info in context
-	c.Locals("user", claims)
+	// Store user ID in context (new handlers expect userID string)
+	c.Locals("userID", claims.UserID)
+	c.Locals("user", claims) // Keep for backward compatibility
 	return c.Next()
 }
 
@@ -202,4 +340,13 @@ func adminMiddleware(c *fiber.Ctx) error {
 		return c.Status(403).JSON(fiber.Map{"error": "Admin access required"})
 	}
 	return c.Next()
+}
+
+// Helper function for nullable int64
+func fromNullInt64(ni sql.NullInt64) *int {
+	if !ni.Valid {
+		return nil
+	}
+	val := int(ni.Int64)
+	return &val
 }
