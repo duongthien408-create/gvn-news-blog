@@ -187,6 +187,33 @@ func setupRoutes(app *fiber.App) {
 	api.Post("/login", login)
 	api.Get("/me", authMiddleware, getMe)
 	api.Put("/me", authMiddleware, updateProfile)
+
+	// ============================================
+	// ADMIN ROUTES (Protected by AdminMiddleware)
+	// ============================================
+	admin := api.Group("/admin", AdminMiddleware)
+
+	// Dashboard
+	admin.Get("/dashboard/stats", GetDashboardStats)
+	admin.Get("/dashboard/activity", GetRecentActivity)
+
+	// Posts Management
+	admin.Get("/posts", GetAdminPosts)
+	admin.Get("/posts/:id", GetAdminPost)
+	admin.Post("/posts", CreateAdminPost)
+	admin.Put("/posts/:id", UpdateAdminPost)
+	admin.Delete("/posts/:id", DeleteAdminPost)
+	admin.Post("/posts/bulk-delete", BulkDeletePosts)
+
+	// Users Management
+	admin.Get("/users", GetAdminUsers)
+	admin.Get("/users/:id", GetAdminUser)
+	admin.Put("/users/:id", UpdateAdminUser)
+	admin.Delete("/users/:id", DeleteAdminUser)
+	admin.Post("/users/:id/ban", BanUser)
+	admin.Post("/users/:id/unban", UnbanUser)
+	admin.Put("/users/:id/role", ChangeUserRole)
+	admin.Post("/users/:id/achievements", GrantAchievement)
 }
 
 // Optional auth middleware (doesn't require auth but extracts user if present)

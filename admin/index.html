@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - GearVN News Blog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-50" x-data="adminApp()" x-init="init()">
+
+    <!-- Sidebar -->
+    <div class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transform transition-transform duration-300 ease-in-out"
+         :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
+
+        <!-- Logo -->
+        <div class="flex items-center justify-between h-16 px-6 bg-gray-800">
+            <div class="flex items-center space-x-3">
+                <div class="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <i data-lucide="shield-check" class="h-5 w-5 text-white"></i>
+                </div>
+                <span class="text-white font-bold text-lg">GearVN Admin</span>
+            </div>
+            <button @click="sidebarOpen = false" class="lg:hidden text-gray-400 hover:text-white">
+                <i data-lucide="x" class="h-6 w-6"></i>
+            </button>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="mt-6 px-3">
+            <template x-for="item in menuItems" :key="item.id">
+                <a :href="item.href"
+                   @click.prevent="navigateTo(item.id)"
+                   class="flex items-center px-3 py-2 mt-2 text-gray-300 rounded-lg hover:bg-gray-800 hover:text-white transition-colors"
+                   :class="currentPage === item.id ? 'bg-gray-800 text-white' : ''">
+                    <i :data-lucide="item.icon" class="h-5 w-5"></i>
+                    <span class="ml-3" x-text="item.name"></span>
+                    <span x-show="item.badge"
+                          class="ml-auto bg-red-600 text-white text-xs px-2 py-0.5 rounded-full"
+                          x-text="item.badge"></span>
+                </a>
+            </template>
+        </nav>
+
+        <!-- User Menu -->
+        <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800">
+            <div class="flex items-center">
+                <img :src="currentUser?.avatar || 'https://i.pravatar.cc/40?u=admin'"
+                     class="h-10 w-10 rounded-full">
+                <div class="ml-3 flex-1">
+                    <p class="text-sm font-medium text-white" x-text="currentUser?.username || 'Admin'"></p>
+                    <p class="text-xs text-gray-400" x-text="currentUser?.role || 'Admin'"></p>
+                </div>
+                <button @click="logout()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="log-out" class="h-5 w-5"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="lg:ml-64 min-h-screen">
+
+        <!-- Top Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-40">
+            <div class="flex items-center justify-between px-6 py-4">
+                <div class="flex items-center space-x-4">
+                    <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden text-gray-600">
+                        <i data-lucide="menu" class="h-6 w-6"></i>
+                    </button>
+                    <h1 class="text-2xl font-bold text-gray-900" x-text="pageTitle"></h1>
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <!-- Search -->
+                    <div class="hidden md:block">
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400"></i>
+                            <input type="text"
+                                   placeholder="Search..."
+                                   class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64">
+                        </div>
+                    </div>
+
+                    <!-- Notifications -->
+                    <button class="relative text-gray-600 hover:text-gray-900">
+                        <i data-lucide="bell" class="h-6 w-6"></i>
+                        <span class="absolute top-0 right-0 h-2 w-2 bg-red-600 rounded-full"></span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <main class="p-6">
+            <!-- Dashboard Page -->
+            <div x-show="currentPage === 'dashboard'" x-cloak>
+                <div id="dashboard-content"></div>
+            </div>
+
+            <!-- Posts Page -->
+            <div x-show="currentPage === 'posts'" x-cloak>
+                <div id="posts-content"></div>
+            </div>
+
+            <!-- Users Page -->
+            <div x-show="currentPage === 'users'" x-cloak>
+                <div id="users-content"></div>
+            </div>
+
+            <!-- Creators Page -->
+            <div x-show="currentPage === 'creators'" x-cloak>
+                <div id="creators-content"></div>
+            </div>
+
+            <!-- Products Page -->
+            <div x-show="currentPage === 'products'" x-cloak>
+                <div id="products-content"></div>
+            </div>
+
+            <!-- Tags Page -->
+            <div x-show="currentPage === 'tags'" x-cloak>
+                <div id="tags-content"></div>
+            </div>
+
+            <!-- Comments Page -->
+            <div x-show="currentPage === 'comments'" x-cloak>
+                <div id="comments-content"></div>
+            </div>
+
+            <!-- Analytics Page -->
+            <div x-show="currentPage === 'analytics'" x-cloak>
+                <div id="analytics-content"></div>
+            </div>
+
+            <!-- Settings Page -->
+            <div x-show="currentPage === 'settings'" x-cloak>
+                <div id="settings-content"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Initialize Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Admin API Client -->
+    <script src="assets/js/api.js"></script>
+
+    <!-- Page Components -->
+    <script src="assets/js/pages/dashboard.js"></script>
+    <script src="assets/js/pages/posts.js"></script>
+    <script src="assets/js/pages/users.js"></script>
+
+    <!-- Main App Script -->
+    <script>
+        function adminApp() {
+            return {
+                sidebarOpen: false,
+                currentPage: 'dashboard',
+                currentUser: null,
+                pageTitle: 'Dashboard',
+
+                menuItems: [
+                    { id: 'dashboard', name: 'Dashboard', icon: 'layout-dashboard', href: '#dashboard' },
+                    { id: 'posts', name: 'Posts', icon: 'file-text', href: '#posts', badge: null },
+                    { id: 'users', name: 'Users', icon: 'users', href: '#users' },
+                    { id: 'creators', name: 'Creators', icon: 'user-check', href: '#creators' },
+                    { id: 'products', name: 'Products', icon: 'package', href: '#products' },
+                    { id: 'tags', name: 'Tags', icon: 'tag', href: '#tags' },
+                    { id: 'comments', name: 'Comments', icon: 'message-square', href: '#comments', badge: '3' },
+                    { id: 'analytics', name: 'Analytics', icon: 'bar-chart-2', href: '#analytics' },
+                    { id: 'settings', name: 'Settings', icon: 'settings', href: '#settings' },
+                ],
+
+                init() {
+                    // Check auth
+                    this.checkAuth();
+
+                    // Load current user
+                    const userStr = localStorage.getItem('admin_user');
+                    if (userStr) {
+                        this.currentUser = JSON.parse(userStr);
+                    }
+
+                    // Initialize Lucide icons
+                    setTimeout(() => lucide.createIcons(), 100);
+
+                    // Load initial page
+                    const hash = window.location.hash.slice(1) || 'dashboard';
+                    this.navigateTo(hash);
+
+                    // Handle browser back/forward
+                    window.addEventListener('hashchange', () => {
+                        const page = window.location.hash.slice(1) || 'dashboard';
+                        this.currentPage = page;
+                        this.loadPageContent(page);
+                    });
+                },
+
+                checkAuth() {
+                    const token = localStorage.getItem('admin_token');
+                    if (!token) {
+                        window.location.href = '/admin/login.html';
+                        return;
+                    }
+
+                    // Set API token
+                    if (window.API) {
+                        window.API.setToken(token);
+                    }
+                },
+
+                navigateTo(pageId) {
+                    this.currentPage = pageId;
+                    window.location.hash = pageId;
+
+                    // Update page title
+                    const menuItem = this.menuItems.find(item => item.id === pageId);
+                    this.pageTitle = menuItem?.name || 'Dashboard';
+
+                    // Load page content
+                    this.loadPageContent(pageId);
+
+                    // Close sidebar on mobile
+                    this.sidebarOpen = false;
+
+                    // Reinitialize icons
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                loadPageContent(pageId) {
+                    // Call page-specific load function
+                    switch(pageId) {
+                        case 'dashboard':
+                            if (window.loadDashboard) window.loadDashboard();
+                            break;
+                        case 'posts':
+                            if (window.loadPosts) window.loadPosts();
+                            break;
+                        case 'users':
+                            if (window.loadUsers) window.loadUsers();
+                            break;
+                        // Add other pages...
+                    }
+                },
+
+                logout() {
+                    if (confirm('Are you sure you want to logout?')) {
+                        localStorage.removeItem('admin_token');
+                        localStorage.removeItem('admin_user');
+                        localStorage.removeItem('admin_remember');
+                        window.location.href = '/admin/login.html';
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

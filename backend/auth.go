@@ -295,6 +295,37 @@ func generateToken(userID, email, role string) (string, error) {
 	return token.SignedString([]byte(jwtSecret))
 }
 
+// ValidateToken validates a JWT token and returns the claims
+func ValidateToken(tokenString string) (map[string]interface{}, error) {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "your-secret-key-change-in-production"
+	}
+
+	// Parse and validate token
+	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(jwtSecret), nil
+	})
+
+	if err != nil || !token.Valid {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*JWTClaims)
+	if !ok {
+		return nil, jwt.ErrTokenInvalidClaims
+	}
+
+	// Convert claims to map for easier access
+	claimsMap := map[string]interface{}{
+		"user_id": claims.UserID,
+		"email":   claims.Email,
+		"role":    claims.Role,
+	}
+
+	return claimsMap, nil
+}
+
 func authMiddleware(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
