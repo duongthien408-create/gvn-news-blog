@@ -293,7 +293,7 @@ const Sidebar = ({ currentPage, onNavigate }) => {
   );
 };
 
-const Header = ({ onNavigateProfile }) => {
+const Header = ({ user, onNavigateProfile }) => {
   return (
     <header className="sticky top-0 z-10 border-b border-theme-border bg-theme-panel/95 backdrop-blur">
       <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6">
@@ -301,7 +301,7 @@ const Header = ({ onNavigateProfile }) => {
           <button className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-theme-border text-theme-secondary">
             <Menu className="h-5 w-5" />
           </button>
-          <span className="text-lg font-semibold text-theme-primary">Creator Hub</span>
+          <span className="text-lg font-semibold text-theme-primary">GearVN Creator Hub</span>
         </div>
 
         <div className="flex flex-1 items-center gap-3 sm:max-w-xl">
@@ -324,11 +324,11 @@ const Header = ({ onNavigateProfile }) => {
             className="flex items-center gap-2 rounded-full border border-theme-border bg-theme-card px-3 py-1.5 text-sm font-medium text-theme-primary transition hover:border-theme-accent hover:text-theme-accent"
           >
             <img
-              src={creatorDirectory.mina.avatar}
-              alt="Mina Review"
+              src={user?.avatar || "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=facearea&w=200&h=200&q=80"}
+              alt="Profile"
               className="h-7 w-7 rounded-full object-cover"
             />
-            <span>Mina Review</span>
+            <span>{user?.username || "Guest"}</span>
           </button>
         </div>
       </div>
@@ -440,7 +440,7 @@ const PostCard = ({
   );
 };
 
-const HomePage = ({ posts, onViewPost, onViewCreator, onToggleUpvote, onToggleSave }) => {
+const HomePage = ({ posts, creatorDirectory, onViewPost, onViewCreator, onToggleUpvote, onToggleSave }) => {
   return (
     <section>
       <div className="mb-6 flex items-center justify-between">
@@ -460,7 +460,7 @@ const HomePage = ({ posts, onViewPost, onViewCreator, onToggleUpvote, onToggleSa
           <PostCard
             key={post.id}
             post={post}
-            creator={creatorDirectory[post.creatorId] || creatorDirectory.mina}
+            creator={creatorDirectory[post.creatorId] || Object.values(creatorDirectory)[0]}
             onViewPost={onViewPost}
             onViewCreator={onViewCreator}
             onToggleUpvote={onToggleUpvote}
@@ -762,19 +762,44 @@ const App = () => {
   const [followingState, setFollowingState] = useState({});
   const [creators, setCreators] = useState([]);
 
+  // Create creator directory from Supabase creators
+  const creatorDirectoryFromDB = useMemo(() => {
+    const directory = {};
+    creators.forEach(creator => {
+      directory[creator.slug] = {
+        id: creator.slug,
+        name: creator.name,
+        avatar: creator.avatar_url || "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=facearea&w=200&h=200&q=80",
+        cover: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80",
+        bio: creator.bio || "Tech content creator",
+        baseFollowers: creator.total_followers || 0,
+        followingCount: 0,
+        verified: creator.verified || false,
+      };
+    });
+    return directory;
+  }, [creators]);
+
+  // Use DB creators if available, fallback to mock data
+  const activeCreatorDirectory = Object.keys(creatorDirectoryFromDB).length > 0
+    ? creatorDirectoryFromDB
+    : creatorDirectory;
+
   // Fetch posts from Supabase
   useEffect(() => {
     const fetchPosts = async () => {
       try {
+        console.log('🔄 Fetching posts from Supabase...');
         const { api } = await import('./lib/supabase');
         const data = await api.getPosts({ limit: 50 });
+        console.log('✅ Posts fetched:', data);
 
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           // Transform Supabase data to match UI component structure
           const transformedPosts = data.map((post) => ({
             id: post.id,
             title: post.title,
-            excerpt: post.excerpt || post.description || "",
+            excerpt: post.description || "",
             image: post.thumbnail_url,
             tags: post.post_tags?.map(pt => pt.tags?.name || pt.tags?.slug) || ["tech"],
             creatorId: post.post_creators?.[0]?.creators?.slug || "unknown",
@@ -787,11 +812,15 @@ const App = () => {
             readTime: "5m",
             content: post.content,
           }));
+          console.log('✅ Transformed posts:', transformedPosts);
           setPosts(transformedPosts);
+        } else {
+          console.warn('⚠️ No posts found in database');
+          setPosts([]);
         }
       } catch (error) {
-        console.error("Failed to fetch posts:", error);
-        // Set sample posts on error for demo
+        console.error("❌ Failed to fetch posts:", error);
+        console.error("Error details:", error.message);
         setPosts([]);
       } finally {
         setIsLoading(false);
@@ -1038,6 +1067,7 @@ const App = () => {
                 {currentPage === "home" && (
                   <HomePage
                     posts={filteredPosts}
+                    creatorDirectory={activeCreatorDirectory}
                     onViewPost={handleViewPost}
                     onViewCreator={handleViewCreator}
                     onToggleUpvote={handleToggleUpvote}

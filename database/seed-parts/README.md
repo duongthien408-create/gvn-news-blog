@@ -12,6 +12,7 @@ Chạy file: `database/02-new-complete-schema.sql`
 1. **01-users-profiles.sql** - User profiles (10 users)
    - Admin, Tech Guru, Gamer Pro, PC Builder, Hardware Fan
    - Review Master, Newbie, Tech Enthusiast, Veteran Gamer, Tech Explorer
+   - Auto-generated user_profiles, user_levels, user_preferences, streaks
 
 2. **02-creators.sql** - Creators & socials (5 creators)
    - Scrapshut (150K subs)
@@ -28,23 +29,34 @@ Chạy file: `database/02-new-complete-schema.sql`
    - 5 categories, 10 brands, 10 products
    - ASUS ROG, Logitech, Razer, NVIDIA, AMD, Samsung, etc.
 
-5. **05-posts.sql** - Posts & relationships
-   - 10 posts với tags, creators, products
-   - Review, video, article types
+5. **05-posts.sql** - Posts & relationships (10 posts)
+   - Posts với content, thumbnails, view counts
+   - post_tags (tags for each post)
+   - post_creators (creator attribution)
+   - post_products (products mentioned in posts)
 
-6. **06-comments.sql** - Comments & replies
-   - 16 comments với nested replies
+6. **06-comments.sql** - Comments & replies (20 comments)
+   - Top-level comments (14 comments)
+   - Nested replies (6 replies)
+   - Vietnamese + English comments
 
 7. **07-interactions.sql** - Votes, bookmarks, follows
-   - User interactions với posts
+   - Post votes (upvotes/downvotes)
+   - Comment votes
+   - Bookmarks (users save posts)
+   - Creator follows (users follow creators)
 
-8. **08-squads.sql** - Squads & members
-   - 5 squads (communities)
-   - Squad members
+8. **08-squads.sql** - Squads & members (5 communities)
+   - PC Master Race, Budget Builds, RGB Everything
+   - Water Cooling Warriors, Laptop Gaming
+   - Squad members with roles (admin, moderator, member)
+   - Squad posts
 
-9. **09-gamification.sql** - Achievements
-   - 7 achievements
-   - User achievements
+9. **09-gamification.sql** - Achievements & progress
+   - 7 achievements (First Steps, Bookworm, Streak Master, etc.)
+   - User achievements unlocked
+   - Updated user levels & points
+   - Updated streaks
 
 ## 🚀 Cách chạy
 
