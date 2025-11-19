@@ -762,21 +762,22 @@ const App = () => {
   const [followingState, setFollowingState] = useState({});
   const [creators, setCreators] = useState([]);
 
-  // Fetch posts from API
+  // Fetch posts from Supabase
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const response = await fetch("http://localhost:8080/api/posts");
-        const data = await response.json();
+        const { api } = await import('./lib/supabase');
+        const data = await api.getPosts({ limit: 50 });
+
         if (Array.isArray(data)) {
-          // Transform API data to match UI component structure
+          // Transform Supabase data to match UI component structure
           const transformedPosts = data.map((post) => ({
             id: post.id,
             title: post.title,
             excerpt: post.excerpt || post.description || "",
             image: post.thumbnail_url,
-            tags: ["tech", "news"],
-            creatorId: "techlab",
+            tags: post.post_tags?.map(pt => pt.tags?.name || pt.tags?.slug) || ["tech"],
+            creatorId: post.post_creators?.[0]?.creators?.slug || "unknown",
             upvotes: post.upvote_count || 0,
             comments: post.comment_count || 0,
             saved: false,
@@ -790,6 +791,8 @@ const App = () => {
         }
       } catch (error) {
         console.error("Failed to fetch posts:", error);
+        // Set sample posts on error for demo
+        setPosts([]);
       } finally {
         setIsLoading(false);
       }
@@ -797,13 +800,15 @@ const App = () => {
 
     const fetchCreators = async () => {
       try {
-        const response = await fetch("http://localhost:8080/api/creators");
-        const data = await response.json();
+        const { api } = await import('./lib/supabase');
+        const data = await api.getCreators();
+
         if (Array.isArray(data)) {
           setCreators(data);
         }
       } catch (error) {
         console.error("Failed to fetch creators:", error);
+        setCreators([]);
       }
     };
 
