@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dark mode colors from scripts/theme.js */
+  --color-surface: 0 0 0;
+  --color-panel: 15 15 15;
+  --color-card: 25 25 25;
+  --color-border: 50 50 50;
+  --color-text-primary: 255 255 255;
+  --color-text-secondary: 200 200 200;
+  --color-text-muted: 150 150 150;
+  --color-accent: 239 68 68;
+  --color-accent-hover: 248 113 113;
+}
+
+body {
+  background-color: rgb(var(--color-surface));
+  color: rgb(var(--color-text-primary));
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-border));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-text-muted));
+}

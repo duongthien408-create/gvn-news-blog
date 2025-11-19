@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -43,13 +44,13 @@ func getCreators(c *fiber.Ctx) error {
 		args = append(args, verified == "true")
 	}
 
-	query += " ORDER BY c.total_followers DESC LIMIT $" + string(rune(len(args)+1))
+	query += " ORDER BY c.total_followers DESC LIMIT $" + strconv.Itoa(len(args)+1)
 	args = append(args, limit)
 
 	rows, err := db.Query(query, args...)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to fetch creators",
+			"error":   "Failed to fetch creators",
 			"details": err.Error(),
 		})
 	}
@@ -141,7 +142,7 @@ func getCreatorBySlug(c *fiber.Ctx) error {
 	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to fetch creator",
+			"error":   "Failed to fetch creator",
 			"details": err.Error(),
 		})
 	}
@@ -257,7 +258,7 @@ func followCreator(c *fiber.Ctx) error {
 
 		return c.JSON(fiber.Map{
 			"success": true,
-			"action": "unfollowed",
+			"action":  "unfollowed",
 		})
 	}
 
@@ -273,7 +274,7 @@ func followCreator(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"success": true,
-		"action": "followed",
+		"action":  "followed",
 	})
 }
 
