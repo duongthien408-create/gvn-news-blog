@@ -297,6 +297,29 @@ async function insertPost(creatorId, item) {
 }
 
 // ============================================
+// DATE FILTERING
+// ============================================
+
+/**
+ * Get yesterday's date at 00:00:00
+ */
+function getYesterdayStart() {
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  yesterday.setHours(0, 0, 0, 0)
+  return yesterday
+}
+
+/**
+ * Check if item date is from yesterday or today
+ */
+function isRecentItem(item) {
+  const yesterday = getYesterdayStart()
+  const itemDate = item.pubDate instanceof Date ? item.pubDate : new Date(item.pubDate)
+  return itemDate >= yesterday
+}
+
+// ============================================
 // MAIN FETCH FUNCTION
 // ============================================
 
@@ -316,48 +339,58 @@ async function fetchFeed(feed) {
 
     if (!response.ok) {
       console.error(`  ❌ HTTP ${response.status}: ${response.statusText}`)
-      return { fetched: 0, inserted: 0, skipped: 0, errors: 1 }
+      return { fetched: 0, inserted: 0, skipped: 0, filtered: 0, errors: 1 }
     }
 
     const xmlText = await response.text()
     const items = parseRSS(xmlText)
 
-    console.log(`  📄 Found ${items.length} items`)
+    console.log(`  📄 Found ${items.length} total items in feed`)
+
+    // Filter to only recent items (yesterday + today)
+    const recentItems = items.filter(isRecentItem)
+    console.log(`  📅 ${recentItems.length} items from yesterday/today`)
+
+    if (recentItems.length === 0) {
+      console.log(`  ⏭️ No recent items to process`)
+      return { fetched: items.length, inserted: 0, skipped: 0, filtered: 0, errors: 0 }
+    }
 
     // Get or create creator
     const creatorId = await getOrCreateCreator(feed)
     if (!creatorId) {
-      return { fetched: items.length, inserted: 0, skipped: 0, errors: 1 }
+      return { fetched: items.length, inserted: 0, skipped: 0, filtered: 0, errors: 1 }
     }
 
     let inserted = 0
     let skipped = 0
+    let filtered = 0
     let errors = 0
-
-    // Process items (limit to 35 most recent per feed for ~100 total)
-    const recentItems = items.slice(0, 35)
 
     for (const item of recentItems) {
       const result = await insertPost(creatorId, item)
 
       if (result.success) {
         inserted++
-        console.log(`  ✅ Inserted: ${item.title.substring(0, 50)}...`)
+        console.log(`  ✅ Inserted: ${item.title.substring(0, 60)}...`)
       } else if (result.skipped) {
         skipped++
+        if (result.reason === 'filtered') {
+          filtered++
+        }
       } else if (result.error) {
         errors++
         console.error(`  ❌ Error: ${result.error}`)
       }
     }
 
-    console.log(`  📊 Results: ${inserted} inserted, ${skipped} skipped, ${errors} errors`)
+    console.log(`  📊 Results: ${inserted} new, ${skipped - filtered} duplicates, ${filtered} filtered, ${errors} errors`)
 
-    return { fetched: items.length, inserted, skipped, errors }
+    return { fetched: items.length, inserted, skipped, filtered, errors }
 
   } catch (err) {
     console.error(`  ❌ Fetch error: ${err.message}`)
-    return { fetched: 0, inserted: 0, skipped: 0, errors: 1 }
+    return { fetched: 0, inserted: 0, skipped: 0, filtered: 0, errors: 1 }
   }
 }
 
@@ -365,27 +398,33 @@ async function fetchFeed(feed) {
  * Main function
  */
 async function main() {
+  const yesterday = getYesterdayStart()
+
   console.log('🚀 GearVN RSS Fetcher')
-  console.log('=' .repeat(50))
-  console.log(`📅 Time: ${new Date().toISOString()}`)
+  console.log('='.repeat(50))
+  console.log(`📅 Run time: ${new Date().toLocaleString('vi-VN')}`)
+  console.log(`📅 Fetching posts from: ${yesterday.toLocaleDateString('vi-VN')} onwards`)
   console.log(`🔗 Supabase: ${SUPABASE_URL}`)
 
-  const totals = { fetched: 0, inserted: 0, skipped: 0, errors: 0 }
+  const totals = { fetched: 0, inserted: 0, skipped: 0, filtered: 0, errors: 0 }
 
   for (const feed of RSS_FEEDS) {
     const result = await fetchFeed(feed)
     totals.fetched += result.fetched
     totals.inserted += result.inserted
     totals.skipped += result.skipped
+    totals.filtered += result.filtered || 0
     totals.errors += result.errors
   }
 
   console.log('\n' + '='.repeat(50))
   console.log('📊 TOTAL RESULTS')
-  console.log(`   Fetched: ${totals.fetched}`)
-  console.log(`   Inserted: ${totals.inserted}`)
-  console.log(`   Skipped (duplicates): ${totals.skipped}`)
-  console.log(`   Errors: ${totals.errors}`)
+  console.log(`   Total in feeds: ${totals.fetched}`)
+  console.log(`   ✅ New posts inserted: ${totals.inserted}`)
+  console.log(`   ⏭️ Duplicates skipped: ${totals.skipped - totals.filtered}`)
+  console.log(`   🚫 Filtered (deals/promo): ${totals.filtered}`)
+  console.log(`   ❌ Errors: ${totals.errors}`)
+  console.log('='.repeat(50))
   console.log('✅ Done!')
 }
 
