@@ -1,80 +1,86 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Supabase configuration
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://qibhlrsdykpkbsnelubz.supabase.co'
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYmhscnNkeWtwa2JzbmVsdWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzNDc4NzEsImV4cCI6MjA3NzkyMzg3MX0.jmwZ8r_7dC8fU5hIlgXrFZUpJBxE07bZyBEuLoG1SrM'
 
-// Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Helper functions for common queries
+// API helper functions
 export const api = {
-  // Posts
-  async getPosts(filters = {}) {
+  // Get all posts (public only) with creator and tags
+  async getPosts({ type = null, today = false } = {}) {
     let query = supabase
       .from('posts')
       .select(`
         *,
-        post_creators(
-          creators(id, name, slug, avatar_url, verified)
-        ),
+        creator:creators(*),
         post_tags(
-          tags(id, name, slug, icon_name)
+          tag:tags(*)
         )
       `)
-      .eq('status', 'published')
+      .eq('status', 'public')
       .order('published_at', { ascending: false })
 
-    if (filters.limit) {
-      query = query.limit(filters.limit)
+    // Filter by type (news/review)
+    if (type) {
+      query = query.eq('type', type)
+    }
+
+    // Filter today only
+    if (today) {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      query = query.gte('published_at', todayStart.toISOString())
     }
 
     const { data, error } = await query
     if (error) throw error
-    return data
+
+    // Transform data to flatten tags
+    return data?.map(post => ({
+      ...post,
+      tags: post.post_tags?.map(pt => pt.tag) || []
+    })) || []
   },
 
-  async getPostBySlug(slug) {
+  // Get single post by ID
+  async getPostById(id) {
     const { data, error } = await supabase
       .from('posts')
       .select(`
         *,
-        post_creators(
-          creators(id, name, slug, avatar_url, verified, bio)
-        ),
+        creator:creators(*),
         post_tags(
-          tags(id, name, slug, icon_name)
-        ),
-        post_products(
-          products(*, brands(*), product_categories(*))
+          tag:tags(*)
         )
       `)
-      .eq('slug', slug)
-      .eq('status', 'published')
+      .eq('id', id)
+      .eq('status', 'public')
       .single()
 
     if (error) throw error
-    return data
+    return {
+      ...data,
+      tags: data?.post_tags?.map(pt => pt.tag) || []
+    }
   },
 
-  // Creators
+  // Get all creators
   async getCreators() {
     const { data, error } = await supabase
       .from('creators')
       .select('*')
-      .order('total_followers', { ascending: false })
+      .order('name')
 
     if (error) throw error
-    return data
+    return data || []
   },
 
+  // Get single creator by slug
   async getCreatorBySlug(slug) {
     const { data, error } = await supabase
       .from('creators')
-      .select(`
-        *,
-        creator_socials(*)
-      `)
+      .select('*')
       .eq('slug', slug)
       .single()
 
@@ -82,95 +88,71 @@ export const api = {
     return data
   },
 
-  // Tags
+  // Get posts by creator
+  async getPostsByCreator(creatorId) {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        creator:creators(*),
+        post_tags(
+          tag:tags(*)
+        )
+      `)
+      .eq('creator_id', creatorId)
+      .eq('status', 'public')
+      .order('published_at', { ascending: false })
+
+    if (error) throw error
+    return data?.map(post => ({
+      ...post,
+      tags: post.post_tags?.map(pt => pt.tag) || []
+    })) || []
+  },
+
+  // Get all tags
   async getTags() {
     const { data, error } = await supabase
       .from('tags')
       .select('*')
-      .order('post_count', { ascending: false })
+      .order('name')
 
     if (error) throw error
-    return data
+    return data || []
   },
 
-  async getTagBySlug(slug) {
-    const { data, error } = await supabase
+  // Get posts by tag
+  async getPostsByTag(tagSlug) {
+    const { data: tag } = await supabase
       .from('tags')
-      .select('*')
-      .eq('slug', slug)
+      .select('id')
+      .eq('slug', tagSlug)
       .single()
 
-    if (error) throw error
-    return data
-  },
+    if (!tag) return []
 
-  // Products
-  async getProducts() {
-    const { data, error} = await supabase
-      .from('products')
-      .select(`
-        *,
-        brands(*),
-        product_categories(*)
-      `)
-      .eq('status', 'available')
-      .order('created_at', { ascending: false })
-
-    if (error) throw error
-    return data
-  },
-
-  // Comments
-  async getCommentsByPostId(postId) {
     const { data, error } = await supabase
-      .from('comments')
+      .from('post_tags')
       .select(`
-        *,
-        users(id, username, user_profiles(display_name, avatar_url))
+        post:posts(
+          *,
+          creator:creators(*),
+          post_tags(
+            tag:tags(*)
+          )
+        )
       `)
-      .eq('post_id', postId)
-      .is('parent_id', null)
-      .order('created_at', { ascending: false })
+      .eq('tag_id', tag.id)
 
     if (error) throw error
+
     return data
-  },
-
-  // Authentication
-  async signUp(email, password, username) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username
-        }
-      }
-    })
-
-    if (error) throw error
-    return data
-  },
-
-  async signIn(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-
-    if (error) throw error
-    return data
-  },
-
-  async signOut() {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
-  },
-
-  async getCurrentUser() {
-    const { data: { user }, error } = await supabase.auth.getUser()
-    if (error) throw error
-    return user
+      ?.map(pt => pt.post)
+      .filter(post => post?.status === 'public')
+      .map(post => ({
+        ...post,
+        tags: post.post_tags?.map(pt => pt.tag) || []
+      })) || []
   }
 }
 
