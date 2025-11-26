@@ -1,0 +1,49 @@
+name: Fetch News
+
+on:
+  # Chạy mỗi ngày lúc 7:00 AM Vietnam time (UTC+7 = 00:00 UTC)
+  schedule:
+    - cron: '0 0 * * *'
+
+  # Cho phép chạy thủ công
+  workflow_dispatch:
+
+jobs:
+  fetch-news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ============================================
+      # RSS Feeds (Node.js)
+      # ============================================
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch RSS feeds
+        run: node scripts/fetch-rss.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      # ============================================
+      # TrendForce (Python)
+      # ============================================
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r scripts/python/requirements.txt
+
+      - name: Fetch TrendForce news
+        working-directory: scripts/python
+        run: python fetch_trendforce.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
