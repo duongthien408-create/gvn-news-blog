@@ -9,6 +9,7 @@ import {
   Hash,
   Globe,
   Zap,
+  Clock,
 } from "lucide-react";
 import { api } from "./lib/supabase";
 
@@ -221,6 +222,18 @@ const PostDetailModal = ({ post, onClose, onViewCreator }) => {
               <span>{post.creator.name}</span>
             </button>
           )}
+          {post.created_at && (
+            <div className="mb-3 flex items-center gap-1.5 text-sm text-zinc-500">
+              <Clock className="h-4 w-4" />
+              {new Date(post.created_at).toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
+          )}
 
           {/* Title */}
           <h2 className="mb-4 text-2xl font-bold text-white">{displayTitle}</h2>
@@ -346,8 +359,16 @@ const PostCard = ({ post, onClick }) => {
   );
 };
 
-// Posts Grid
+// Posts Grid with Load More
+const POSTS_PER_PAGE = 18;
+
 const PostsGrid = ({ posts, onSelectPost, emptyMessage }) => {
+  const [visibleCount, setVisibleCount] = useState(POSTS_PER_PAGE);
+
+  useEffect(() => {
+    setVisibleCount(POSTS_PER_PAGE);
+  }, [posts.length]);
+
   if (posts.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-900/50">
@@ -356,12 +377,27 @@ const PostsGrid = ({ posts, onSelectPost, emptyMessage }) => {
     );
   }
 
+  const visiblePosts = posts.slice(0, visibleCount);
+  const hasMore = visibleCount < posts.length;
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} onClick={() => onSelectPost(post)} />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        {visiblePosts.map((post) => (
+          <PostCard key={post.id} post={post} onClick={() => onSelectPost(post)} />
+        ))}
+      </div>
+      {hasMore && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => setVisibleCount((prev) => prev + POSTS_PER_PAGE)}
+            className="rounded-xl border border-zinc-700 px-6 py-2.5 text-sm font-medium text-zinc-300 transition hover:border-red-500 hover:text-red-500"
+          >
+            Load More ({posts.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
+    </>
   );
 };
 
