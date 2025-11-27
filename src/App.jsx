@@ -10,6 +10,7 @@ import {
   Globe,
   Zap,
   Clock,
+  Users,
 } from "lucide-react";
 import { api } from "./lib/supabase";
 
@@ -34,6 +35,11 @@ const heroConfig = {
     icon: Zap,
     title: "Today's Feed",
     subtitle: "Tất cả nội dung mới được cập nhật trong ngày hôm nay",
+  },
+  creators: {
+    icon: Users,
+    title: "Creators",
+    subtitle: "Các YouTuber và reviewer công nghệ hàng đầu Việt Nam",
   },
 };
 
@@ -323,15 +329,15 @@ const PostCard = ({ post, onClick }) => {
       )}
       <div className="p-3">
         {post.creator && (
-          <div className="mb-2 flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <div className="mb-2 flex items-center gap-2 text-xs text-zinc-500">
             {post.creator.avatar_url && (
               <img
                 src={post.creator.avatar_url}
                 alt={post.creator.name}
-                className="h-4 w-4 rounded-full"
+                className="h-6 w-6 rounded-full"
               />
             )}
-            <span className="truncate">{post.creator.name}</span>
+            <span className="truncate font-medium">{post.creator.name}</span>
           </div>
         )}
         <h3 className="mb-2 line-clamp-2 text-sm font-bold leading-snug text-white group-hover:text-red-500">
@@ -401,6 +407,72 @@ const PostsGrid = ({ posts, onSelectPost, emptyMessage }) => {
   );
 };
 
+// Creator Card for grid
+const CreatorCard = ({ creator, postCount, isYouTuber, onClick }) => {
+  return (
+    <article
+      onClick={onClick}
+      className="group cursor-pointer overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 p-4 transition hover:border-zinc-700"
+    >
+      <div className="flex flex-col items-center text-center">
+        {creator.avatar_url ? (
+          <img
+            src={creator.avatar_url}
+            alt={creator.name}
+            className="mb-3 h-16 w-16 rounded-full object-cover ring-2 ring-zinc-700 transition group-hover:ring-red-500"
+          />
+        ) : (
+          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-800 ring-2 ring-zinc-700 transition group-hover:ring-red-500">
+            <Users className="h-8 w-8 text-zinc-500" />
+          </div>
+        )}
+        <h3 className="mb-1 text-sm font-bold text-white group-hover:text-red-500">
+          {creator.name}
+        </h3>
+        <p className="text-xs text-zinc-500">
+          {postCount} {isYouTuber ? "videos" : "articles"}
+        </p>
+        {creator.channel_url && (
+          <a
+            href={creator.channel_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-2 text-[10px] text-red-500 hover:underline"
+          >
+            {isYouTuber ? "YouTube Channel →" : "Website →"}
+          </a>
+        )}
+      </div>
+    </article>
+  );
+};
+
+// Creators Grid
+const CreatorsGrid = ({ creators, postCounts, creatorTypes, onSelectCreator }) => {
+  if (creators.length === 0) {
+    return (
+      <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-900/50">
+        <p className="text-sm text-zinc-500">No creators found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+      {creators.map((creator) => (
+        <CreatorCard
+          key={creator.id}
+          creator={creator}
+          postCount={postCounts[creator.id] || 0}
+          isYouTuber={creatorTypes[creator.id] === "review"}
+          onClick={() => onSelectCreator(creator.slug)}
+        />
+      ))}
+    </div>
+  );
+};
+
 // Creator Profile Page
 const CreatorPage = ({ creator, posts, onBack, onSelectPost }) => {
   if (!creator) {
@@ -459,6 +531,9 @@ const App = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [posts, setPosts] = useState([]);
   const [tags, setTags] = useState([]);
+  const [creators, setCreators] = useState([]);
+  const [creatorPostCounts, setCreatorPostCounts] = useState({});
+  const [creatorTypes, setCreatorTypes] = useState({});
   const [selectedTag, setSelectedTag] = useState(null);
   const [selectedCreator, setSelectedCreator] = useState(null);
   const [creatorPosts, setCreatorPosts] = useState([]);
@@ -468,12 +543,29 @@ const App = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [postsData, tagsData] = await Promise.all([
+        const [postsData, tagsData, creatorsData] = await Promise.all([
           api.getPosts(),
           api.getTags(),
+          api.getCreators(),
         ]);
         setPosts(postsData);
         setTags(tagsData);
+        setCreators(creatorsData);
+
+        // Calculate post counts and types per creator
+        const counts = {};
+        const types = {};
+        postsData.forEach((post) => {
+          if (post.creator_id) {
+            counts[post.creator_id] = (counts[post.creator_id] || 0) + 1;
+            // Set type based on post type (review = YouTuber, news = news source)
+            if (!types[post.creator_id]) {
+              types[post.creator_id] = post.type;
+            }
+          }
+        });
+        setCreatorPostCounts(counts);
+        setCreatorTypes(types);
       } catch (error) {
         console.error("Failed to fetch data:", error);
       } finally {
@@ -567,6 +659,15 @@ const App = () => {
                     setSelectedCreator(null);
                   }}
                 />
+                <TabButton
+                  active={currentTab === "creators"}
+                  icon={Users}
+                  label="Creators"
+                  onClick={() => {
+                    setCurrentTab("creators");
+                    setSelectedCreator(null);
+                  }}
+                />
               </div>
             </div>
             <div className="w-5 lg:hidden" />
@@ -585,6 +686,16 @@ const App = () => {
               onBack={() => setSelectedCreator(null)}
               onSelectPost={setSelectedPost}
             />
+          ) : currentTab === "creators" ? (
+            <>
+              <HeroSection tab={currentTab} postCount={creators.length} />
+              <CreatorsGrid
+                creators={creators}
+                postCounts={creatorPostCounts}
+                creatorTypes={creatorTypes}
+                onSelectCreator={handleViewCreator}
+              />
+            </>
           ) : (
             <>
               <HeroSection tab={currentTab} postCount={filteredPosts.length} />
