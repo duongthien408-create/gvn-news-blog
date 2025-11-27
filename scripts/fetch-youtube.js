@@ -24,40 +24,16 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 // channel_id can be found in the channel URL or via YouTube
 const YOUTUBE_CHANNELS = [
   {
-    name: 'Linus Tech Tips',
-    slug: 'linus-tech-tips',
-    channel_id: 'UCXuqSBlHAE6Xw-yeJA0Tunw',
-    avatar_url: 'https://yt3.googleusercontent.com/Vy6KL7EM_apxPSxF0pPy5w_c87YDTOlBQo3MADZ0rnBB6R2CLXmXYYmqR2eGFnEkjrZ4CkBK=s160-c-k-c0x00ffffff-no-rj'
+    name: 'GEARVN',
+    slug: 'gearvn',
+    channel_id: 'UCdxRpD_T4-HzPsely-Fcezw',
+    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_mQwtnJSqKELr3eEU2U2qZV5DhYdYc_3nbON5hG0YUDhw=s160-c-k-c0x00ffffff-no-rj'
   },
   {
-    name: 'Gamers Nexus',
-    slug: 'gamers-nexus',
-    channel_id: 'UChIs72whgZI9w6d6FhwGGHA',
-    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_niS3VFe0PyqQEoGQGZkStGu-3UYlFpYjJdfJLSdkFB2g=s160-c-k-c0x00ffffff-no-rj'
-  },
-  {
-    name: 'JayzTwoCents',
-    slug: 'jayztwocents',
-    channel_id: 'UCkWQ0gDrqOCarmUKmppD7GQ',
-    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_kMv5MBskXTOqMh-PA9AhfZdOuGHX5p1BkUABx9pw=s160-c-k-c0x00ffffff-no-rj'
-  },
-  {
-    name: 'Hardware Unboxed',
-    slug: 'hardware-unboxed',
-    channel_id: 'UCI8iQa1hv7oV_Z8D35vVuSg',
-    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_nSPKJcaJnYb1cL6PN0mJK7K0w4PqlNKvNx-9nKnMs=s160-c-k-c0x00ffffff-no-rj'
-  },
-  {
-    name: 'Dave2D',
-    slug: 'dave2d',
-    channel_id: 'UCVYamHliCI9rw1tHR1xbkfw',
-    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_lzv0x7LXb3RCp5iG4s0f4cVX4A3iqK4Y0GPWA8Eg=s160-c-k-c0x00ffffff-no-rj'
-  },
-  {
-    name: 'MKBHD',
-    slug: 'mkbhd',
-    channel_id: 'UCBJycsmduvYEL83R_U4JriQ',
-    avatar_url: 'https://yt3.googleusercontent.com/lkH37D712tiyphLBeDvmi5qTnOk8HNPgAi3HzfmJPjVTz-H7mJq6Q_hPqjXQQGq6OPGi_yXB=s160-c-k-c0x00ffffff-no-rj'
+    name: 'Tài Xài Tech',
+    slug: 'tai-xai-tech',
+    channel_id: 'UCiYYo7oPjA_MQ9i7-zoNfGA',
+    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_kXHqAqGMf-3g7EH8_0j9kPVKm_oVYhH0fD3FoY=s160-c-k-c0x00ffffff-no-rj'
   }
 ]
 
@@ -121,7 +97,10 @@ function parseYouTubeRSS(xmlText) {
     const descMatch = entryXml.match(/<media:description>([^<]*)<\/media:description>/)
     const description = descMatch ? descMatch[1].trim() : ''
 
-    if (videoId && title && link) {
+    // Only include Shorts (skip regular videos)
+    const isShort = link && link.includes('/shorts/')
+
+    if (videoId && title && link && isShort) {
       items.push({
         videoId,
         title: decodeHtmlEntities(title),
