@@ -162,8 +162,8 @@ const PostDetailModal = ({ post, onClose, onViewCreator }) => {
   if (!post) return null;
 
   const isReview = post.type === "review";
-  const displayTitle = post.title_vi || post.title;
-  const displaySummary = post.summary_vi || post.summary;
+  const displayTitle = post.title_vi;
+  const displaySummary = post.summary_vi;
 
   const handleCTAClick = () => {
     window.open(post.source_url, "_blank");
@@ -295,7 +295,7 @@ const PostDetailModal = ({ post, onClose, onViewCreator }) => {
 // Post Card - With Tags
 const PostCard = ({ post, onClick }) => {
   const isReview = post.type === "review";
-  const displayTitle = post.title_vi || post.title;
+  const displayTitle = post.title_vi;
 
   return (
     <article

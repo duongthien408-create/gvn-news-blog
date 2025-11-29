@@ -19,7 +19,7 @@ export const api = {
         )
       `)
       .eq('status', 'public')
-      .order('published_at', { ascending: false })
+      .order('created_at', { ascending: false })
 
     // Filter by type (news/review)
     if (type) {
@@ -30,7 +30,7 @@ export const api = {
     if (today) {
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
-      query = query.gte('published_at', todayStart.toISOString())
+      query = query.gte('created_at', todayStart.toISOString())
     }
 
     const { data, error } = await query
@@ -101,7 +101,7 @@ export const api = {
       `)
       .eq('creator_id', creatorId)
       .eq('status', 'public')
-      .order('published_at', { ascending: false })
+      .order('created_at', { ascending: false })
 
     if (error) throw error
     return data?.map(post => ({
