@@ -24,6 +24,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Node.js dependencies
+        run: npm install
+
       - name: Fetch RSS feeds
         run: node scripts/fetch-rss.js
         env:
