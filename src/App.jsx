@@ -11,6 +11,11 @@ import {
   Zap,
   Clock,
   Users,
+  TrendingUp,
+  Cpu,
+  Monitor,
+  Gamepad2,
+  Plus,
 } from "lucide-react";
 import { api } from "./lib/supabase";
 
@@ -19,27 +24,51 @@ const formatTagName = (name) => {
   return name.toLowerCase();
 };
 
-// Hero config for each tab - all use red theme
+// Hero config for each tab - tech style with KV
 const heroConfig = {
   news: {
     icon: Globe,
     title: "Tech News",
     subtitle: "Tin tức công nghệ mới nhất từ các nguồn uy tín trên thế giới",
+    gradient: "from-red-600 via-orange-500 to-yellow-500",
+    bgPattern: "news",
+    stats: [
+      { icon: TrendingUp, label: "Trending", value: "Hot" },
+      { icon: Globe, label: "Sources", value: "4+" },
+    ],
   },
   review: {
     icon: Play,
     title: "Video Reviews",
     subtitle: "Đánh giá chi tiết từ các YouTuber và reviewer hàng đầu",
+    gradient: "from-red-500 via-pink-500 to-purple-500",
+    bgPattern: "review",
+    stats: [
+      { icon: Play, label: "Videos", value: "HD" },
+      { icon: Users, label: "Creators", value: "VN" },
+    ],
   },
   today: {
     icon: Zap,
     title: "Today's Feed",
     subtitle: "Tất cả nội dung mới được cập nhật trong ngày hôm nay",
+    gradient: "from-cyan-500 via-blue-500 to-indigo-500",
+    bgPattern: "today",
+    stats: [
+      { icon: Zap, label: "Fresh", value: "24h" },
+      { icon: TrendingUp, label: "Updates", value: "Live" },
+    ],
   },
   creators: {
     icon: Users,
     title: "Creators",
     subtitle: "Các YouTuber và reviewer công nghệ hàng đầu Việt Nam",
+    gradient: "from-emerald-500 via-teal-500 to-cyan-500",
+    bgPattern: "creators",
+    stats: [
+      { icon: Users, label: "Verified", value: "Pro" },
+      { icon: Monitor, label: "Content", value: "Tech" },
+    ],
   },
 };
 
@@ -134,25 +163,101 @@ const TabButton = ({ active, icon: Icon, label, onClick }) => (
   </button>
 );
 
-// Hero Section
+// Hero Section - Tech Style with KV
 const HeroSection = ({ tab, postCount }) => {
   const config = heroConfig[tab];
   const Icon = config.icon;
+
   return (
-    <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-      <div className="flex items-center gap-4">
-        <div className="rounded-xl bg-red-500/20 p-3">
-          <Icon className="h-8 w-8 text-red-500" />
-        </div>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-white">{config.title}</h1>
-          <p className="mt-1 text-sm text-zinc-400">{config.subtitle}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-4xl font-bold text-red-500">{postCount}</p>
-          <p className="text-sm text-zinc-500">posts</p>
+    <div className="relative mb-6 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
+      {/* Background Pattern - Circuit/Tech Lines */}
+      <div className="absolute inset-0 opacity-10">
+        <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="circuit" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+              <path d="M0 50 H40 M60 50 H100 M50 0 V40 M50 60 V100" stroke="currentColor" strokeWidth="1" fill="none" className="text-white" />
+              <circle cx="50" cy="50" r="4" fill="currentColor" className="text-white" />
+              <circle cx="0" cy="50" r="2" fill="currentColor" className="text-white" />
+              <circle cx="100" cy="50" r="2" fill="currentColor" className="text-white" />
+              <circle cx="50" cy="0" r="2" fill="currentColor" className="text-white" />
+              <circle cx="50" cy="100" r="2" fill="currentColor" className="text-white" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#circuit)" />
+        </svg>
+      </div>
+
+      {/* Gradient Overlay */}
+      <div className={`absolute inset-0 bg-gradient-to-r ${config.gradient} opacity-10`} />
+
+      {/* Glow Effect */}
+      <div className={`absolute -top-20 -right-20 h-40 w-40 rounded-full bg-gradient-to-r ${config.gradient} opacity-20 blur-3xl`} />
+      <div className={`absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-gradient-to-r ${config.gradient} opacity-15 blur-2xl`} />
+
+      {/* Content */}
+      <div className="relative z-10 p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left: Icon + Title */}
+          <div className="flex items-start gap-4">
+            {/* Animated Icon Container */}
+            <div className={`relative rounded-2xl bg-gradient-to-br ${config.gradient} p-0.5`}>
+              <div className="rounded-2xl bg-zinc-900 p-3">
+                <Icon className="h-8 w-8 text-white" />
+              </div>
+              {/* Pulse ring */}
+              <div className={`absolute inset-0 -z-10 animate-ping rounded-2xl bg-gradient-to-br ${config.gradient} opacity-20`} style={{ animationDuration: '3s' }} />
+            </div>
+
+            <div className="flex-1">
+              {/* Title with gradient */}
+              <h1 className={`bg-gradient-to-r ${config.gradient} bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-3xl`}>
+                {config.title}
+              </h1>
+              <p className="mt-1 max-w-md text-sm text-zinc-400">
+                {config.subtitle}
+              </p>
+
+              {/* Stats badges */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {config.stats.map((stat, idx) => {
+                  const StatIcon = stat.icon;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1.5 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-2.5 py-1 backdrop-blur-sm"
+                    >
+                      <StatIcon className="h-3.5 w-3.5 text-zinc-400" />
+                      <span className="text-xs text-zinc-500">{stat.label}</span>
+                      <span className={`bg-gradient-to-r ${config.gradient} bg-clip-text text-xs font-bold text-transparent`}>
+                        {stat.value}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Post Count */}
+          <div className="flex items-center gap-4 sm:flex-col sm:items-end sm:gap-1">
+            <div className="flex items-baseline gap-1">
+              <span className={`bg-gradient-to-r ${config.gradient} bg-clip-text text-4xl font-black tabular-nums text-transparent sm:text-5xl`}>
+                {postCount}
+              </span>
+              <span className="text-lg font-medium text-zinc-500">+</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className={`h-2 w-2 animate-pulse rounded-full bg-gradient-to-r ${config.gradient}`} />
+              <span className="text-sm font-medium uppercase tracking-wider text-zinc-500">
+                {tab === 'creators' ? 'Creators' : 'Posts'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Bottom accent line */}
+      <div className={`h-1 w-full bg-gradient-to-r ${config.gradient}`} />
     </div>
   );
 };
@@ -525,10 +630,19 @@ const CreatorPage = ({ creator, posts, onBack, onSelectPost }) => {
   );
 };
 
+// Import Auth components
+import AuthModal from './components/auth/AuthModal';
+import UserMenu from './components/auth/UserMenu';
+import SubmitModal from './components/submit/SubmitModal';
+import AdminPanel from './components/admin/AdminPanel';
+
 // Main App
 const App = () => {
   const [currentTab, setCurrentTab] = useState("news");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [submitModalOpen, setSubmitModalOpen] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [posts, setPosts] = useState([]);
   const [tags, setTags] = useState([]);
   const [creators, setCreators] = useState([]);
@@ -608,6 +722,16 @@ const App = () => {
     }
   };
 
+  // Refresh posts after submit
+  const handleSubmitSuccess = async () => {
+    try {
+      const postsData = await api.getPosts();
+      setPosts(postsData);
+    } catch (error) {
+      console.error("Failed to refresh posts:", error);
+    }
+  };
+
   const filteredPosts = getFilteredPosts();
 
   return (
@@ -630,7 +754,7 @@ const App = () => {
               <Menu className="h-5 w-5" />
             </button>
             <div className="text-sm font-bold lg:hidden">GearVN</div>
-            <div className="flex flex-1 items-center justify-center">
+            <div className="flex flex-1 items-center justify-center lg:justify-start lg:pl-4">
               <div className="flex gap-0.5 rounded-lg bg-zinc-900 p-0.5">
                 <TabButton
                   active={currentTab === "news"}
@@ -670,12 +794,28 @@ const App = () => {
                 />
               </div>
             </div>
+            {/* Submit + User Menu */}
+            <div className="hidden items-center gap-3 lg:flex">
+              <button
+                onClick={() => setSubmitModalOpen(true)}
+                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-500 to-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:from-red-600 hover:to-orange-600"
+              >
+                <Plus className="h-4 w-4" />
+                Submit
+              </button>
+              <UserMenu
+                onOpenAuth={() => setAuthModalOpen(true)}
+                onOpenAdmin={() => setShowAdminPanel(true)}
+              />
+            </div>
             <div className="w-5 lg:hidden" />
           </div>
         </header>
 
         <main className="p-3 lg:p-4">
-          {isLoading ? (
+          {showAdminPanel ? (
+            <AdminPanel onBack={() => setShowAdminPanel(false)} />
+          ) : isLoading ? (
             <div className="flex h-48 items-center justify-center">
               <div className="text-sm text-zinc-500">Loading...</div>
             </div>
@@ -731,6 +871,20 @@ const App = () => {
           onViewCreator={handleViewCreator}
         />
       )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+      />
+
+      {/* Submit Modal */}
+      <SubmitModal
+        isOpen={submitModalOpen}
+        onClose={() => setSubmitModalOpen(false)}
+        tags={tags}
+        onSuccess={handleSubmitSuccess}
+      />
     </div>
   );
 };
