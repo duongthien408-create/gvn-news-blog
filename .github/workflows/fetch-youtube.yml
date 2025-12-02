@@ -1,11 +1,11 @@
-name: Fetch YouTube Reviews
+name: Fetch YouTube Videos + Transcripts
 
 on:
-  # Chạy mỗi ngày lúc 8:00 AM Vietnam time (UTC+7 = 01:00 UTC)
+  # Run every day at 8:00 AM Vietnam time (UTC+7 = 01:00 UTC)
   schedule:
     - cron: '0 1 * * *'
 
-  # Cho phép chạy thủ công
+  # Allow manual trigger
   workflow_dispatch:
 
 jobs:
@@ -16,13 +16,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '20'
+          python-version: '3.11'
 
-      - name: Fetch YouTube videos
-        run: node scripts/fetch-youtube.js
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      - name: Install dependencies
+        run: |
+          pip install yt-dlp supabase
+
+      - name: Fetch YouTube videos with transcripts
+        run: python scripts/fetch_youtube_with_transcript.py
