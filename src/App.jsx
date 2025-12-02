@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Newspaper,
   Play,
@@ -16,6 +17,9 @@ import {
   Monitor,
   Gamepad2,
   Plus,
+  FileText,
+  Sparkles,
+  BookOpen,
 } from "lucide-react";
 import { api } from "./lib/supabase";
 
@@ -68,6 +72,17 @@ const heroConfig = {
     stats: [
       { icon: Users, label: "Verified", value: "Pro" },
       { icon: Monitor, label: "Content", value: "Tech" },
+    ],
+  },
+  articles: {
+    icon: FileText,
+    title: "Articles",
+    subtitle: "Bài viết chuyên sâu từ các reviewer công nghệ hàng đầu",
+    gradient: "from-violet-500 via-purple-500 to-fuchsia-500",
+    bgPattern: "articles",
+    stats: [
+      { icon: BookOpen, label: "Deep Dive", value: "Pro" },
+      { icon: Users, label: "Reviewers", value: "VN" },
     ],
   },
 };
@@ -148,20 +163,63 @@ const Sidebar = ({ tags, selectedTag, onSelectTag, isOpen, onClose }) => {
   );
 };
 
-// Tab Button
-const TabButton = ({ active, icon: Icon, label, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition ${
-      active
-        ? "bg-white text-zinc-900"
-        : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
-    }`}
-  >
-    <Icon className="h-4 w-4" />
-    {label}
-  </button>
-);
+// Tab Button with dynamic color based on tab type
+const tabColors = {
+  news: {
+    bg: "from-orange-500/20 to-red-500/20",
+    border: "border-orange-500/50",
+    shadow: "shadow-[0_0_15px_rgba(249,115,22,0.3)]",
+    icon: "text-orange-400",
+  },
+  review: {
+    bg: "from-red-500/20 to-rose-500/20",
+    border: "border-red-500/50",
+    shadow: "shadow-[0_0_15px_rgba(239,68,68,0.3)]",
+    icon: "text-red-400",
+  },
+  articles: {
+    bg: "from-purple-500/20 to-fuchsia-500/20",
+    border: "border-purple-500/50",
+    shadow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]",
+    icon: "text-purple-400",
+  },
+  creators: {
+    bg: "from-emerald-500/20 to-teal-500/20",
+    border: "border-emerald-500/50",
+    shadow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]",
+    icon: "text-emerald-400",
+  },
+  today: {
+    bg: "from-yellow-500/20 to-amber-500/20",
+    border: "border-yellow-500/50",
+    shadow: "shadow-[0_0_15px_rgba(234,179,8,0.3)]",
+    icon: "text-yellow-400",
+  },
+};
+
+const TabButton = ({ active, icon: Icon, label, onClick, tabKey }) => {
+  const colors = tabColors[tabKey] || tabColors.news;
+
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-300 ${
+        active
+          ? "text-white"
+          : "text-zinc-500 hover:text-zinc-300"
+      }`}
+    >
+      {active && (
+        <span className={`absolute inset-0 rounded-lg bg-gradient-to-r ${colors.bg} backdrop-blur-sm`} />
+      )}
+      {active && (
+        <span className={`absolute inset-0 rounded-lg border ${colors.border} ${colors.shadow}`} />
+      )}
+      <Icon className={`relative h-4 w-4 ${active ? colors.icon : ""}`} />
+      <span className="relative">{label}</span>
+    </button>
+  );
+};
 
 // Hero Section - Tech Style with KV
 const HeroSection = ({ tab, postCount }) => {
@@ -370,27 +428,42 @@ const PostDetailModal = ({ post, onClose, onViewCreator }) => {
             </div>
           )}
 
-          {/* CTA Button */}
-          <button
-            onClick={handleCTAClick}
-            className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-base font-bold transition ${
-              isReview
-                ? "bg-red-500 text-white hover:bg-red-600"
-                : "border-2 border-zinc-700 text-zinc-300 hover:border-red-500 hover:text-red-500"
-            }`}
-          >
-            {isReview ? (
-              <>
-                <Play className="h-5 w-5" />
-                View Video
-              </>
-            ) : (
-              <>
-                <ExternalLink className="h-5 w-5" />
-                Read Full Article
-              </>
+          {/* CTA Buttons */}
+          <div className="flex flex-col gap-3">
+            {/* Read Article button - show if post has linked article */}
+            {post.article && post.article.slug && (
+              <Link
+                to={`/articles/${post.article.slug}`}
+                onClick={onClose}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-fuchsia-500 py-3 text-base font-bold text-white transition hover:from-purple-600 hover:to-fuchsia-600"
+              >
+                <BookOpen className="h-5 w-5" />
+                Read Article
+              </Link>
             )}
-          </button>
+
+            {/* View Source button */}
+            <button
+              onClick={handleCTAClick}
+              className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-base font-bold transition ${
+                isReview
+                  ? "bg-red-500 text-white hover:bg-red-600"
+                  : "border-2 border-zinc-700 text-zinc-300 hover:border-red-500 hover:text-red-500"
+              }`}
+            >
+              {isReview ? (
+                <>
+                  <Play className="h-5 w-5" />
+                  Watch Video
+                </>
+              ) : (
+                <>
+                  <ExternalLink className="h-5 w-5" />
+                  Read Original
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -401,6 +474,7 @@ const PostDetailModal = ({ post, onClose, onViewCreator }) => {
 const PostCard = ({ post, onClick }) => {
   const isReview = post.type === "review";
   const displayTitle = post.title_vi;
+  const hasArticle = post.article && post.article.slug;
 
   return (
     <article
@@ -421,7 +495,7 @@ const PostCard = ({ post, onClick }) => {
               </div>
             </div>
           )}
-          <div className="absolute left-2 top-2">
+          <div className="absolute left-2 top-2 flex gap-1">
             <span
               className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
                 isReview ? "bg-red-500 text-white" : "bg-zinc-800/90 text-zinc-300"
@@ -429,6 +503,12 @@ const PostCard = ({ post, onClick }) => {
             >
               {isReview ? "Review" : "News"}
             </span>
+            {hasArticle && (
+              <span className="flex items-center gap-0.5 rounded bg-purple-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <BookOpen className="h-2.5 w-2.5" />
+                Article
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -505,6 +585,110 @@ const PostsGrid = ({ posts, onSelectPost, emptyMessage }) => {
             className="rounded-xl border border-zinc-700 px-6 py-2.5 text-sm font-medium text-zinc-300 transition hover:border-red-500 hover:text-red-500"
           >
             Load More ({posts.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
+    </>
+  );
+};
+
+// Article Card - Grid card layout like PostCard
+const ArticleCard = ({ article }) => {
+  return (
+    <Link
+      to={`/articles/${article.slug}`}
+      className="group block overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 transition hover:border-zinc-700"
+    >
+      {article.thumbnail_url && (
+        <div className="relative aspect-video overflow-hidden">
+          <img
+            src={article.thumbnail_url}
+            alt={article.title}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          />
+          <div className="absolute left-2 top-2">
+            <span className="flex items-center gap-0.5 rounded bg-purple-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+              <FileText className="h-2.5 w-2.5" />
+              Article
+            </span>
+          </div>
+        </div>
+      )}
+      <div className="p-3">
+        {article.creator && (
+          <div className="mb-2 flex items-center gap-2 text-xs text-zinc-500">
+            {article.creator.avatar_url && (
+              <img
+                src={article.creator.avatar_url}
+                alt={article.creator.name}
+                className="h-6 w-6 rounded-full"
+              />
+            )}
+            <span className="truncate font-medium">{article.creator.name}</span>
+          </div>
+        )}
+        <h3 className="mb-2 line-clamp-2 text-sm font-bold leading-snug text-white group-hover:text-purple-500">
+          {article.title}
+        </h3>
+        {article.tags && article.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {article.tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag.id}
+                className="rounded-md bg-zinc-800 px-2 py-1 text-xs text-zinc-400"
+              >
+                #{formatTagName(tag.name)}
+              </span>
+            ))}
+            {article.tags.length > 3 && (
+              <span className="text-[10px] text-zinc-500">
+                +{article.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+};
+
+// Articles Grid - Grid layout like PostsGrid
+const ARTICLES_PER_PAGE = 18;
+
+const ArticlesGrid = ({ articles, emptyMessage }) => {
+  const [visibleCount, setVisibleCount] = useState(ARTICLES_PER_PAGE);
+
+  useEffect(() => {
+    setVisibleCount(ARTICLES_PER_PAGE);
+  }, [articles.length]);
+
+  if (articles.length === 0) {
+    return (
+      <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-900/50">
+        <FileText className="mb-2 h-8 w-8 text-zinc-600" />
+        <p className="text-sm text-zinc-500">{emptyMessage}</p>
+        <p className="mt-1 text-xs text-zinc-600">Bài viết sẽ xuất hiện khi có nội dung mới</p>
+      </div>
+    );
+  }
+
+  const visibleArticles = articles.slice(0, visibleCount);
+  const hasMore = visibleCount < articles.length;
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        {visibleArticles.map((article) => (
+          <ArticleCard key={article.id} article={article} />
+        ))}
+      </div>
+      {hasMore && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => setVisibleCount((prev) => prev + ARTICLES_PER_PAGE)}
+            className="rounded-xl border border-zinc-700 px-6 py-2.5 text-sm font-medium text-zinc-300 transition hover:border-purple-500 hover:text-purple-500"
+          >
+            Load More ({articles.length - visibleCount} remaining)
           </button>
         </div>
       )}
@@ -638,9 +822,18 @@ import AdminPanel from './components/admin/AdminPanel';
 
 // Main App
 const App = () => {
-  const [currentTab, setCurrentTab] = useState("news");
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const [currentTab, setCurrentTab] = useState(tabFromUrl || "news");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  // Update tab when URL changes
+  useEffect(() => {
+    if (tabFromUrl && ["news", "review", "today", "creators", "articles"].includes(tabFromUrl)) {
+      setCurrentTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [posts, setPosts] = useState([]);
@@ -652,19 +845,22 @@ const App = () => {
   const [selectedCreator, setSelectedCreator] = useState(null);
   const [creatorPosts, setCreatorPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
+  const [articles, setArticles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [postsData, tagsData, creatorsData] = await Promise.all([
+        const [postsData, tagsData, creatorsData, articlesData] = await Promise.all([
           api.getPosts(),
           api.getTags(),
           api.getCreators(),
+          api.getArticles(),
         ]);
         setPosts(postsData);
         setTags(tagsData);
         setCreators(creatorsData);
+        setArticles(articlesData || []);
 
         // Calculate post counts and types per creator
         const counts = {};
@@ -754,12 +950,15 @@ const App = () => {
               <Menu className="h-5 w-5" />
             </button>
             <div className="text-sm font-bold lg:hidden">GearVN</div>
-            <div className="flex flex-1 items-center justify-center lg:justify-start lg:pl-4">
-              <div className="flex gap-0.5 rounded-lg bg-zinc-900 p-0.5">
+            <div className="flex flex-1 items-center justify-center">
+              <div className="relative flex gap-1 rounded-xl border border-zinc-800/80 bg-zinc-900/90 p-1 backdrop-blur-md">
+                {/* Tech glow effect */}
+                <div className="absolute -inset-[1px] rounded-xl bg-gradient-to-r from-cyan-500/10 via-transparent to-purple-500/10 opacity-50" />
                 <TabButton
                   active={currentTab === "news"}
                   icon={Newspaper}
                   label="News"
+                  tabKey="news"
                   onClick={() => {
                     setCurrentTab("news");
                     setSelectedCreator(null);
@@ -769,17 +968,19 @@ const App = () => {
                   active={currentTab === "review"}
                   icon={Play}
                   label="Review"
+                  tabKey="review"
                   onClick={() => {
                     setCurrentTab("review");
                     setSelectedCreator(null);
                   }}
                 />
                 <TabButton
-                  active={currentTab === "today"}
-                  icon={Calendar}
-                  label="Today"
+                  active={currentTab === "articles"}
+                  icon={FileText}
+                  label="Articles"
+                  tabKey="articles"
                   onClick={() => {
-                    setCurrentTab("today");
+                    setCurrentTab("articles");
                     setSelectedCreator(null);
                   }}
                 />
@@ -787,8 +988,19 @@ const App = () => {
                   active={currentTab === "creators"}
                   icon={Users}
                   label="Creators"
+                  tabKey="creators"
                   onClick={() => {
                     setCurrentTab("creators");
+                    setSelectedCreator(null);
+                  }}
+                />
+                <TabButton
+                  active={currentTab === "today"}
+                  icon={Calendar}
+                  label="Today"
+                  tabKey="today"
+                  onClick={() => {
+                    setCurrentTab("today");
                     setSelectedCreator(null);
                   }}
                 />
@@ -834,6 +1046,28 @@ const App = () => {
                 postCounts={creatorPostCounts}
                 creatorTypes={creatorTypes}
                 onSelectCreator={handleViewCreator}
+              />
+            </>
+          ) : currentTab === "articles" ? (
+            <>
+              <HeroSection tab={currentTab} postCount={articles.length} />
+              {selectedTag && (
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-xs text-zinc-500">Filtering:</span>
+                  <span className="rounded-md bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-500">
+                    #{formatTagName(selectedTag)}
+                  </span>
+                  <button
+                    onClick={() => setSelectedTag(null)}
+                    className="text-[10px] text-zinc-500 hover:text-white"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+              <ArticlesGrid
+                articles={selectedTag ? articles.filter(a => a.tags?.some(t => t.slug === selectedTag)) : articles}
+                emptyMessage="No articles found"
               />
             </>
           ) : (

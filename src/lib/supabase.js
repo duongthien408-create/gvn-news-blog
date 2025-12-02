@@ -7,7 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // API helper functions
 export const api = {
-  // Get all posts (public only) with creator and tags
+  // Get all posts (public only) with creator, tags, and linked article
   async getPosts({ type = null, today = false } = {}) {
     let query = supabase
       .from('posts')
@@ -16,7 +16,8 @@ export const api = {
         creator:creators(*),
         post_tags(
           tag:tags(*)
-        )
+        ),
+        article:articles!posts_article_id_fkey(id, slug, title)
       `)
       .eq('status', 'public')
       .order('created_at', { ascending: false })
@@ -52,7 +53,8 @@ export const api = {
         creator:creators(*),
         post_tags(
           tag:tags(*)
-        )
+        ),
+        article:articles!posts_article_id_fkey(id, slug, title)
       `)
       .eq('id', id)
       .eq('status', 'public')
@@ -97,7 +99,8 @@ export const api = {
         creator:creators(*),
         post_tags(
           tag:tags(*)
-        )
+        ),
+        article:articles!posts_article_id_fkey(id, slug, title)
       `)
       .eq('creator_id', creatorId)
       .eq('status', 'public')
@@ -153,6 +156,77 @@ export const api = {
         ...post,
         tags: post.post_tags?.map(pt => pt.tag) || []
       })) || []
+  },
+
+  // Get all articles (AI-generated from video transcripts)
+  async getArticles() {
+    const { data, error } = await supabase
+      .from('articles')
+      .select(`
+        *,
+        creator:creators(*),
+        article_tags(
+          tag:tags(*)
+        )
+      `)
+      .eq('status', 'public')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      // If table doesn't exist yet, return empty array
+      if (error.code === '42P01') return []
+      throw error
+    }
+
+    // Transform data to flatten tags
+    return data?.map(article => ({
+      ...article,
+      tags: article.article_tags?.map(at => at.tag) || []
+    })) || []
+  },
+
+  // Get single article by ID
+  async getArticleById(id) {
+    const { data, error } = await supabase
+      .from('articles')
+      .select(`
+        *,
+        creator:creators(*),
+        article_tags(
+          tag:tags(*)
+        )
+      `)
+      .eq('id', id)
+      .eq('status', 'public')
+      .single()
+
+    if (error) throw error
+    return {
+      ...data,
+      tags: data?.article_tags?.map(at => at.tag) || []
+    }
+  },
+
+  // Get single article by slug
+  async getArticleBySlug(slug) {
+    const { data, error } = await supabase
+      .from('articles')
+      .select(`
+        *,
+        creator:creators(*),
+        article_tags(
+          tag:tags(*)
+        )
+      `)
+      .eq('slug', slug)
+      .eq('status', 'public')
+      .single()
+
+    if (error) throw error
+    return {
+      ...data,
+      tags: data?.article_tags?.map(at => at.tag) || []
+    }
   }
 }
 
