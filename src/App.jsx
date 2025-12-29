@@ -7,23 +7,14 @@ import {
   ExternalLink,
   Menu,
   X,
-  Hash,
   Globe,
   Zap,
   Clock,
   Users,
   TrendingUp,
-  Cpu,
   Monitor,
-  Gamepad2,
-  Plus,
   FileText,
-  Sparkles,
   BookOpen,
-  ChevronDown,
-  ChevronRight,
-  Tag,
-  Building2,
 } from "lucide-react";
 import { api } from "./lib/supabase";
 import Sidebar from "./components/Sidebar";
@@ -743,19 +734,12 @@ const CreatorPage = ({ creator, posts, onBack, onSelectPost }) => {
   );
 };
 
-// Import Auth components
-import AuthModal from './components/auth/AuthModal';
-import UserMenu from './components/auth/UserMenu';
-import SubmitModal from './components/submit/SubmitModal';
-import AdminPanel from './components/admin/AdminPanel';
-
 // Main App
 const App = () => {
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
   const [currentTab, setCurrentTab] = useState(tabFromUrl || "news");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Update tab when URL changes
   useEffect(() => {
@@ -763,8 +747,7 @@ const App = () => {
       setCurrentTab(tabFromUrl);
     }
   }, [tabFromUrl]);
-  const [submitModalOpen, setSubmitModalOpen] = useState(false);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
+
   const [posts, setPosts] = useState([]);
   const [tags, setTags] = useState([]);
   const [creators, setCreators] = useState([]);
@@ -847,15 +830,6 @@ const App = () => {
     }
   };
 
-  // Refresh posts after submit
-  const handleSubmitSuccess = async () => {
-    try {
-      const postsData = await api.getPosts();
-      setPosts(postsData);
-    } catch (error) {
-      console.error("Failed to refresh posts:", error);
-    }
-  };
 
   const filteredPosts = getFilteredPosts();
 
@@ -935,28 +909,13 @@ const App = () => {
                 />
               </div>
             </div>
-            {/* Submit + User Menu */}
-            <div className="hidden items-center gap-3 lg:flex">
-              <button
-                onClick={() => setSubmitModalOpen(true)}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-500 to-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:from-red-600 hover:to-orange-600"
-              >
-                <Plus className="h-4 w-4" />
-                Submit
-              </button>
-              <UserMenu
-                onOpenAuth={() => setAuthModalOpen(true)}
-                onOpenAdmin={() => setShowAdminPanel(true)}
-              />
-            </div>
             <div className="w-5 lg:hidden" />
           </div>
         </header>
 
         <main className="p-3 lg:p-4">
-          {showAdminPanel ? (
-            <AdminPanel onBack={() => setShowAdminPanel(false)} />
-          ) : isLoading ? (
+          
+          {isLoading ? (
             <div className="flex h-48 items-center justify-center">
               <div className="text-sm text-zinc-500">Loading...</div>
             </div>
@@ -1035,19 +994,6 @@ const App = () => {
         />
       )}
 
-      {/* Auth Modal */}
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-      />
-
-      {/* Submit Modal */}
-      <SubmitModal
-        isOpen={submitModalOpen}
-        onClose={() => setSubmitModalOpen(false)}
-        tags={tags}
-        onSuccess={handleSubmitSuccess}
-      />
     </div>
   );
 };

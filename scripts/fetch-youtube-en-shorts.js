@@ -1,10 +1,10 @@
 /**
- * YouTube Fetch Script for English Tech Channels
+ * YouTube Fetch Script - English Shorts
  *
- * Fetches latest LONG videos (not Shorts) from English YouTube channels
- * Saves to posts with language='en' for n8n to translate to Vietnamese
+ * Fetches YouTube Shorts from English tech channels
+ * Needs translation via n8n before publishing
  *
- * Usage: node scripts/fetch-youtube-en.js
+ * Usage: node scripts/fetch-youtube-en-shorts.js
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -18,30 +18,30 @@ const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-// English YouTube channels for tech content
-const YOUTUBE_CHANNELS_EN = [
+// English YouTube channels
+const CHANNELS = [
   {
-    name: 'Just Josh',
-    slug: 'just-josh',
-    channel_id: 'UCtHm9ai5zSb-yfRnnUBopAg',
+    name: 'Marques Brownlee',
+    slug: 'mkbhd',
+    channel_id: 'UCBJycsmduvYEL83R_U4JriQ',
     avatar_url: null
   },
   {
-    name: "Jarrod's Tech",
-    slug: 'jarrods-tech',
-    channel_id: 'UC2Rzju32yQPkQ7oIhmeuLwg',
+    name: 'Linus Tech Tips',
+    slug: 'linus-tech-tips',
+    channel_id: 'UCXuqSBlHAE6Xw-yeJA0Tunw',
     avatar_url: null
   },
   {
-    name: 'NoodleNick',
-    slug: 'noodlenick',
-    channel_id: 'UCthAJeiDA_7iKyzYElbrgjg',
+    name: 'Dave2D',
+    slug: 'dave2d',
+    channel_id: 'UCVYamHliCI9rw1tHR1xbkfw',
     avatar_url: null
   }
 ]
 
 // ============================================
-// YOUTUBE RSS PARSING
+// YOUTUBE HELPERS
 // ============================================
 
 function getYouTubeRSSUrl(channelId) {
@@ -52,8 +52,18 @@ function getVideoThumbnail(videoId) {
   return `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
 }
 
+function decodeHtmlEntities(text) {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+}
+
 /**
- * Parse YouTube RSS feed - get LONG videos only (not Shorts)
+ * Parse YouTube RSS feed - get Shorts only
  */
 function parseYouTubeRSS(xmlText) {
   const items = []
@@ -78,10 +88,14 @@ function parseYouTubeRSS(xmlText) {
     const descMatch = entryXml.match(/<media:description>([^<]*)<\/media:description>/)
     const description = descMatch ? descMatch[1].trim() : ''
 
-    // Skip Shorts - only get long videos
-    const isShort = link && link.includes('/shorts/')
+    // Only get Shorts
+    const isShort =
+      title.includes('#shorts') ||
+      title.includes('#short') ||
+      title.toLowerCase().includes('shorts') ||
+      description.includes('#shorts')
 
-    if (videoId && title && link && !isShort) {
+    if (videoId && title && link && isShort) {
       items.push({
         videoId,
         title: decodeHtmlEntities(title),
@@ -96,16 +110,6 @@ function parseYouTubeRSS(xmlText) {
   return items
 }
 
-function decodeHtmlEntities(text) {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-}
-
 // ============================================
 // SUPABASE OPERATIONS
 // ============================================
@@ -117,9 +121,7 @@ async function getOrCreateCreator(channel) {
     .eq('slug', channel.slug)
     .single()
 
-  if (existing) {
-    return existing.id
-  }
+  if (existing) return existing.id
 
   const { data: created, error } = await supabase
     .from('creators')
@@ -152,7 +154,7 @@ async function postExists(sourceUrl) {
 }
 
 /**
- * Insert video as draft post with language='en'
+ * Insert video as draft - needs n8n translation
  */
 async function insertVideo(creatorId, video) {
   if (await postExists(video.link)) {
@@ -164,14 +166,16 @@ async function insertVideo(creatorId, video) {
     .insert({
       creator_id: creatorId,
       type: 'review',
-      status: 'draft',
-      language: 'en',  // Mark as English
+      status: 'draft',  // Needs translation first
+      
+      
       title: video.title,
+      // title_vi will be set by n8n after translation
       summary: video.description,
+      // summary_vi will be set by n8n after translation
       source_url: video.link,
       thumbnail_url: video.thumbnail,
       created_at: video.pubDate.toISOString()
-      // title_vi, summary_vi, transcript_vi will be set by n8n after translation
     })
     .select('id')
     .single()
@@ -200,36 +204,32 @@ function isRecentVideo(video) {
 }
 
 // ============================================
-// MAIN FETCH FUNCTION
+// MAIN
 // ============================================
 
 async function fetchChannel(channel) {
   console.log(`\n📺 Fetching: ${channel.name}`)
   const rssUrl = getYouTubeRSSUrl(channel.channel_id)
-  console.log(`   RSS: ${rssUrl}`)
 
   try {
     const response = await fetch(rssUrl, {
-      headers: {
-        'User-Agent': 'GearVN-YouTube-Bot/1.0'
-      }
+      headers: { 'User-Agent': 'GearVN-Bot/1.0' }
     })
 
     if (!response.ok) {
-      console.error(`  ❌ HTTP ${response.status}: ${response.statusText}`)
+      console.error(`  ❌ HTTP ${response.status}`)
       return { fetched: 0, inserted: 0, skipped: 0, errors: 1 }
     }
 
     const xmlText = await response.text()
     const videos = parseYouTubeRSS(xmlText)
 
-    console.log(`  📄 Found ${videos.length} long videos in feed`)
+    console.log(`  📄 Found ${videos.length} Shorts`)
 
     const recentVideos = videos.filter(isRecentVideo)
-    console.log(`  📅 ${recentVideos.length} videos from last 7 days`)
+    console.log(`  📅 ${recentVideos.length} from last 7 days`)
 
     if (recentVideos.length === 0) {
-      console.log(`  ⏭️ No recent videos to process`)
       return { fetched: videos.length, inserted: 0, skipped: 0, errors: 0 }
     }
 
@@ -238,46 +238,41 @@ async function fetchChannel(channel) {
       return { fetched: videos.length, inserted: 0, skipped: 0, errors: 1 }
     }
 
-    let inserted = 0
-    let skipped = 0
-    let errors = 0
+    let inserted = 0, skipped = 0, errors = 0
 
     for (const video of recentVideos) {
       const result = await insertVideo(creatorId, video)
 
       if (result.success) {
         inserted++
-        console.log(`  ✅ Inserted: ${video.title.substring(0, 50)}...`)
+        console.log(`  ✅ ${video.title.substring(0, 50)}...`)
       } else if (result.skipped) {
         skipped++
       } else if (result.error) {
         errors++
-        console.error(`  ❌ Error: ${result.error}`)
+        console.error(`  ❌ ${result.error}`)
       }
     }
 
-    console.log(`  📊 Results: ${inserted} new, ${skipped} duplicates, ${errors} errors`)
-
+    console.log(`  📊 ${inserted} new, ${skipped} duplicates, ${errors} errors`)
     return { fetched: videos.length, inserted, skipped, errors }
 
   } catch (err) {
-    console.error(`  ❌ Fetch error: ${err.message}`)
+    console.error(`  ❌ ${err.message}`)
     return { fetched: 0, inserted: 0, skipped: 0, errors: 1 }
   }
 }
 
 async function main() {
-  console.log('🎬 GearVN YouTube Fetcher (English Channels)')
+  console.log('🎬 YouTube Fetcher - English Shorts')
   console.log('='.repeat(50))
-  console.log(`📅 Run time: ${new Date().toLocaleString('vi-VN')}`)
-  console.log(`📅 Fetching LONG videos from last 7 days`)
-  console.log(`🌐 Language: English (will be translated by n8n)`)
-  console.log(`🔗 Supabase: ${SUPABASE_URL}`)
-  console.log(`📺 Channels: ${YOUTUBE_CHANNELS_EN.length}`)
+  console.log(`📅 ${new Date().toLocaleString('vi-VN')}`)
+  console.log(`📺 Channels: ${CHANNELS.length}`)
+  console.log('⚠️  Posts saved as DRAFT - needs n8n translation')
 
   const totals = { fetched: 0, inserted: 0, skipped: 0, errors: 0 }
 
-  for (const channel of YOUTUBE_CHANNELS_EN) {
+  for (const channel of CHANNELS) {
     const result = await fetchChannel(channel)
     totals.fetched += result.fetched
     totals.inserted += result.inserted
@@ -286,18 +281,12 @@ async function main() {
   }
 
   console.log('\n' + '='.repeat(50))
-  console.log('📊 TOTAL RESULTS')
-  console.log(`   Total videos in feeds: ${totals.fetched}`)
-  console.log(`   ✅ New videos inserted: ${totals.inserted}`)
-  console.log(`   ⏭️ Duplicates skipped: ${totals.skipped}`)
+  console.log('📊 TOTAL')
+  console.log(`   ✅ New (draft): ${totals.inserted}`)
+  console.log(`   ⏭️ Skipped: ${totals.skipped}`)
   console.log(`   ❌ Errors: ${totals.errors}`)
   console.log('='.repeat(50))
-  console.log('✅ Done!')
-  console.log('')
-  console.log('💡 Next step: n8n will:')
-  console.log('   1. Fetch transcript (English)')
-  console.log('   2. Translate title/summary/transcript to Vietnamese')
-  console.log('   3. Update title_vi, summary_vi, transcript_vi')
+  console.log('💡 Next: n8n will translate and publish')
 }
 
 main().catch(console.error)

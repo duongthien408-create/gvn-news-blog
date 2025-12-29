@@ -1,29 +1,54 @@
-name: Fetch YouTube Videos + Transcripts
+name: Fetch YouTube Videos
 
 on:
-  # Run every day at 8:00 AM Vietnam time (UTC+7 = 01:00 UTC)
+  # Run every 6 hours
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 */6 * * *'
 
   # Allow manual trigger
   workflow_dispatch:
 
 jobs:
-  fetch-youtube:
+  fetch-youtube-vn:
+    name: Fetch Vietnamese YouTube
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: '20'
 
       - name: Install dependencies
-        run: |
-          pip install yt-dlp supabase
+        run: npm install @supabase/supabase-js
 
-      - name: Fetch YouTube videos with transcripts
-        run: python scripts/fetch_youtube_with_transcript.py
+      - name: Fetch Vietnamese Shorts
+        run: node scripts/fetch-youtube-vn-shorts.js
+
+      - name: Fetch Vietnamese Long Videos
+        run: node scripts/fetch-youtube-vn-videos.js
+
+  fetch-youtube-en:
+    name: Fetch English YouTube (Draft)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install @supabase/supabase-js
+
+      - name: Fetch English Shorts
+        run: node scripts/fetch-youtube-en-shorts.js
+
+      - name: Fetch English Long Videos
+        run: node scripts/fetch-youtube-en-videos.js

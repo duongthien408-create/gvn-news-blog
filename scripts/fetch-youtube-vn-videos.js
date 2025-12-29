@@ -1,12 +1,10 @@
 /**
- * YouTube Fetch Script for GearVN Reviews
+ * YouTube Fetch Script - Vietnamese Long Videos
  *
- * Fetches latest videos from YouTube channels via RSS
- * No API key needed - uses YouTube's public RSS feeds
+ * Fetches long-form videos from Vietnamese tech channels
+ * Already in Vietnamese - no translation needed
  *
- * Saves as drafts to Supabase for transcript processing via n8n
- *
- * Usage: node scripts/fetch-youtube.js
+ * Usage: node scripts/fetch-youtube-vn-videos.js
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -20,87 +18,102 @@ const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-// YouTube channels for tech reviews
-// channel_id can be found in the channel URL or via YouTube
-const YOUTUBE_CHANNELS = [
+// Vietnamese YouTube channels - Long form content
+const CHANNELS = [
   {
-    name: 'GEARVN',
-    slug: 'gearvn',
-    channel_id: 'UCdxRpD_T4-HzPsely-Fcezw',
-    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_mQwtnJSqKELr3eEU2U2qZV5DhYdYc_3nbON5hG0YUDhw=s160-c-k-c0x00ffffff-no-rj'
+    name: 'Vinh Xô',
+    slug: 'vinh-xo',
+    channel_id: 'UCLZpAJd0Amw5G6phSUhR8ag',
+    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_nEe8GgqxM3S0qiKuQPz2kM_Bv_jMvO_jCCYxBXB-fimQ=s160-c-k-c0x00ffffff-no-rj'
+  },
+  {
+    name: 'Người Chơi Đồ',
+    slug: 'nguoi-choi-do',
+    channel_id: 'UC8aE0MNQY5Yw5Ix0YEF-yGA',
+    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_nqQlkIhxUgp5Kw6JQaLFsFnTdJGdN-UmI5nCwXwg=s160-c-k-c0x00ffffff-no-rj'
+  },
+  {
+    name: 'Vật Vờ Studio',
+    slug: 'vat-vo-studio',
+    channel_id: 'UCJgnh5YioIPMVKkEt9gFfRQ',
+    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_nBjPx4P3TjDcJWFhLqBB87lpOCmpQzBqP-MzY76A=s160-c-k-c0x00ffffff-no-rj'
+  },
+  {
+    name: 'GenZ Việt',
+    slug: 'genz-viet',
+    channel_id: 'UCMHBxoLXZfs_TmMOV6f8a7A',
+    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_mj_G4kOyJCg_Mjpe4KcM9IlYKJnIIExPyPCHWcTg=s160-c-k-c0x00ffffff-no-rj'
   },
   {
     name: 'Tài Xài Tech',
     slug: 'tai-xai-tech',
     channel_id: 'UCiYYo7oPjA_MQ9i7-zoNfGA',
     avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_kXHqAqGMf-3g7EH8_0j9kPVKm_oVYhH0fD3FoY=s160-c-k-c0x00ffffff-no-rj'
+  },
+  {
+    name: 'GEARVN',
+    slug: 'gearvn',
+    channel_id: 'UCdxRpD_T4-HzPsely-Fcezw',
+    avatar_url: 'https://yt3.googleusercontent.com/ytc/AIdro_mQwtnJSqKELr3eEU2U2qZV5DhYdYc_3nbON5hG0YUDhw=s160-c-k-c0x00ffffff-no-rj'
   }
 ]
 
 // ============================================
-// YOUTUBE RSS PARSING
+// YOUTUBE HELPERS
 // ============================================
 
-/**
- * Get YouTube RSS feed URL from channel ID
- */
 function getYouTubeRSSUrl(channelId) {
   return `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`
 }
 
-/**
- * Extract video ID from YouTube URL
- */
-function extractVideoId(url) {
-  const match = url.match(/watch\?v=([^&]+)/) || url.match(/\/videos\/([^/?]+)/)
-  return match ? match[1] : null
-}
-
-/**
- * Get high quality thumbnail URL
- */
 function getVideoThumbnail(videoId) {
-  // maxresdefault is 1280x720, hqdefault is 480x360
   return `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
 }
 
+function decodeHtmlEntities(text) {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+}
+
 /**
- * Parse YouTube RSS feed (Atom format)
+ * Parse YouTube RSS feed - get long videos only (exclude Shorts)
  */
 function parseYouTubeRSS(xmlText) {
   const items = []
-
-  // Extract all <entry> blocks
   const entryRegex = /<entry>([\s\S]*?)<\/entry>/gi
   let match
 
   while ((match = entryRegex.exec(xmlText)) !== null) {
     const entryXml = match[1]
 
-    // Extract video ID
     const videoIdMatch = entryXml.match(/<yt:videoId>([^<]+)<\/yt:videoId>/)
     const videoId = videoIdMatch ? videoIdMatch[1] : null
 
-    // Extract title
     const titleMatch = entryXml.match(/<title>([^<]+)<\/title>/)
     const title = titleMatch ? titleMatch[1] : null
 
-    // Extract link
     const linkMatch = entryXml.match(/<link[^>]*href="([^"]+)"/)
     const link = linkMatch ? linkMatch[1] : null
 
-    // Extract published date
     const publishedMatch = entryXml.match(/<published>([^<]+)<\/published>/)
     const published = publishedMatch ? new Date(publishedMatch[1]) : new Date()
 
-    // Extract description/summary
     const descMatch = entryXml.match(/<media:description>([^<]*)<\/media:description>/)
     const description = descMatch ? descMatch[1].trim() : ''
 
-    // Only include Shorts (skip regular videos)
-    const isShort = link && link.includes('/shorts/')
+    // Skip Shorts - check title and description for short indicators
+    const isShort =
+      title.includes('#shorts') ||
+      title.includes('#short') ||
+      title.toLowerCase().includes('shorts') ||
+      description.includes('#shorts')
 
-    if (videoId && title && link && isShort) {
+    if (videoId && title && link && !isShort) {
       items.push({
         videoId,
         title: decodeHtmlEntities(title),
@@ -115,39 +128,19 @@ function parseYouTubeRSS(xmlText) {
   return items
 }
 
-/**
- * Decode HTML entities
- */
-function decodeHtmlEntities(text) {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-}
-
 // ============================================
 // SUPABASE OPERATIONS
 // ============================================
 
-/**
- * Get or create creator
- */
 async function getOrCreateCreator(channel) {
-  // Try to find existing creator
   const { data: existing } = await supabase
     .from('creators')
     .select('id')
     .eq('slug', channel.slug)
     .single()
 
-  if (existing) {
-    return existing.id
-  }
+  if (existing) return existing.id
 
-  // Create new creator
   const { data: created, error } = await supabase
     .from('creators')
     .insert({
@@ -168,9 +161,6 @@ async function getOrCreateCreator(channel) {
   return created.id
 }
 
-/**
- * Check if post already exists (by source_url)
- */
 async function postExists(sourceUrl) {
   const { data } = await supabase
     .from('posts')
@@ -182,27 +172,29 @@ async function postExists(sourceUrl) {
 }
 
 /**
- * Insert video as draft post
+ * Insert video - Vietnamese videos go directly to public
  */
 async function insertVideo(creatorId, video) {
-  // Check for duplicate
   if (await postExists(video.link)) {
     return { skipped: true, reason: 'duplicate' }
   }
 
-  // Insert post as review type
   const { data: post, error } = await supabase
     .from('posts')
     .insert({
       creator_id: creatorId,
       type: 'review',
-      status: 'draft',
+      status: 'public',  // Direct to public - no translation needed
+      
+      
       title: video.title,
+      title_vi: video.title,
       summary: video.description,
+      summary_vi: video.description,
       source_url: video.link,
       thumbnail_url: video.thumbnail,
-      created_at: video.pubDate.toISOString()
-      // title_vi, summary_vi will be set by n8n after transcript processing
+      created_at: video.pubDate.toISOString(),
+      published_at: new Date().toISOString()
     })
     .select('id')
     .single()
@@ -218,9 +210,6 @@ async function insertVideo(creatorId, video) {
 // DATE FILTERING
 // ============================================
 
-/**
- * Get date from N days ago at 00:00:00
- */
 function getDaysAgo(days) {
   const date = new Date()
   date.setDate(date.getDate() - days)
@@ -228,100 +217,80 @@ function getDaysAgo(days) {
   return date
 }
 
-/**
- * Check if video is recent (within last 7 days)
- */
 function isRecentVideo(video) {
   const weekAgo = getDaysAgo(7)
   return video.pubDate >= weekAgo
 }
 
 // ============================================
-// MAIN FETCH FUNCTION
+// MAIN
 // ============================================
 
-/**
- * Fetch and process a single YouTube channel
- */
 async function fetchChannel(channel) {
   console.log(`\n📺 Fetching: ${channel.name}`)
   const rssUrl = getYouTubeRSSUrl(channel.channel_id)
-  console.log(`   RSS: ${rssUrl}`)
 
   try {
     const response = await fetch(rssUrl, {
-      headers: {
-        'User-Agent': 'GearVN-YouTube-Bot/1.0'
-      }
+      headers: { 'User-Agent': 'GearVN-Bot/1.0' }
     })
 
     if (!response.ok) {
-      console.error(`  ❌ HTTP ${response.status}: ${response.statusText}`)
+      console.error(`  ❌ HTTP ${response.status}`)
       return { fetched: 0, inserted: 0, skipped: 0, errors: 1 }
     }
 
     const xmlText = await response.text()
     const videos = parseYouTubeRSS(xmlText)
 
-    console.log(`  📄 Found ${videos.length} videos in feed`)
+    console.log(`  📄 Found ${videos.length} long videos`)
 
-    // Filter to only recent videos (last 7 days)
     const recentVideos = videos.filter(isRecentVideo)
-    console.log(`  📅 ${recentVideos.length} videos from last 7 days`)
+    console.log(`  📅 ${recentVideos.length} from last 7 days`)
 
     if (recentVideos.length === 0) {
-      console.log(`  ⏭️ No recent videos to process`)
       return { fetched: videos.length, inserted: 0, skipped: 0, errors: 0 }
     }
 
-    // Get or create creator
     const creatorId = await getOrCreateCreator(channel)
     if (!creatorId) {
       return { fetched: videos.length, inserted: 0, skipped: 0, errors: 1 }
     }
 
-    let inserted = 0
-    let skipped = 0
-    let errors = 0
+    let inserted = 0, skipped = 0, errors = 0
 
     for (const video of recentVideos) {
       const result = await insertVideo(creatorId, video)
 
       if (result.success) {
         inserted++
-        console.log(`  ✅ Inserted: ${video.title.substring(0, 50)}...`)
+        console.log(`  ✅ ${video.title.substring(0, 50)}...`)
       } else if (result.skipped) {
         skipped++
       } else if (result.error) {
         errors++
-        console.error(`  ❌ Error: ${result.error}`)
+        console.error(`  ❌ ${result.error}`)
       }
     }
 
-    console.log(`  📊 Results: ${inserted} new, ${skipped} duplicates, ${errors} errors`)
-
+    console.log(`  📊 ${inserted} new, ${skipped} duplicates, ${errors} errors`)
     return { fetched: videos.length, inserted, skipped, errors }
 
   } catch (err) {
-    console.error(`  ❌ Fetch error: ${err.message}`)
+    console.error(`  ❌ ${err.message}`)
     return { fetched: 0, inserted: 0, skipped: 0, errors: 1 }
   }
 }
 
-/**
- * Main function
- */
 async function main() {
-  console.log('🎬 GearVN YouTube Fetcher')
+  console.log('🎬 YouTube Fetcher - Vietnamese Long Videos')
   console.log('='.repeat(50))
-  console.log(`📅 Run time: ${new Date().toLocaleString('vi-VN')}`)
-  console.log(`📅 Fetching videos from last 7 days`)
-  console.log(`🔗 Supabase: ${SUPABASE_URL}`)
-  console.log(`📺 Channels: ${YOUTUBE_CHANNELS.length}`)
+  console.log(`📅 ${new Date().toLocaleString('vi-VN')}`)
+  console.log(`📺 Channels: ${CHANNELS.length}`)
 
   const totals = { fetched: 0, inserted: 0, skipped: 0, errors: 0 }
 
-  for (const channel of YOUTUBE_CHANNELS) {
+  for (const channel of CHANNELS) {
     const result = await fetchChannel(channel)
     totals.fetched += result.fetched
     totals.inserted += result.inserted
@@ -330,16 +299,11 @@ async function main() {
   }
 
   console.log('\n' + '='.repeat(50))
-  console.log('📊 TOTAL RESULTS')
-  console.log(`   Total videos in feeds: ${totals.fetched}`)
-  console.log(`   ✅ New videos inserted: ${totals.inserted}`)
-  console.log(`   ⏭️ Duplicates skipped: ${totals.skipped}`)
+  console.log('📊 TOTAL')
+  console.log(`   ✅ New: ${totals.inserted}`)
+  console.log(`   ⏭️ Skipped: ${totals.skipped}`)
   console.log(`   ❌ Errors: ${totals.errors}`)
   console.log('='.repeat(50))
-  console.log('✅ Done!')
-  console.log('')
-  console.log('💡 Next step: Use n8n to process transcripts for new videos')
 }
 
-// Run
 main().catch(console.error)
