@@ -7,7 +7,10 @@ export default {
     darkMode: "class",
     theme: {
         extend: {
-            fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] },
+            fontFamily: {
+                sans: ["Inter", "system-ui", "sans-serif"],
+                heading: ["Space Grotesk", "Inter", "system-ui", "sans-serif"]
+            },
             colors: {
                 "hub-surface": "#0f172a",
                 "hub-panel": "#111a2e",
