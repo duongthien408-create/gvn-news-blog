@@ -1,5 +1,6 @@
 // G-Auth API functions
-const API_BASE = 'https://api-gauth.uat.gearvn.xyz';
+// Use proxy in dev to avoid CORS, direct URL in production
+const API_BASE = import.meta.env.DEV ? '/api/gauth' : 'https://api-gauth.uat.gearvn.xyz';
 const TENANT_ID = '019b01a2-3647-7a8f-98ad-67cc00c35d8c';
 const TOKEN_KEY = 'g_auth_access_token';
 const REFRESH_KEY = 'g_auth_refresh_token';
